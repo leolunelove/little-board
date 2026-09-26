@@ -1,0 +1,512 @@
+/* Soft sky, quiet type, and a little depth. All interaction lives in globals.css. */
+body {
+  min-height: 100dvh;
+  background:
+    radial-gradient(ellipse 900px 440px at 50% -100px, var(--sky), transparent),
+    var(--paper);
+}
+::selection {
+  background: var(--button);
+  color: var(--button-ink);
+}
+.memo-shell {
+  width: min(736px, calc(100% - 48px));
+  margin: 48px auto 32px;
+  padding: 20px 38px 24px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  box-shadow:
+    0 3px 8px var(--shadow),
+    0 28px 80px -28px var(--shadow);
+}
+.memo-signature {
+  display: block;
+  margin-bottom: 17px;
+  font-size: 16px;
+  font-weight: 650;
+  letter-spacing: -0.65px;
+  color: var(--ink);
+}
+.memo-signature > span,
+.wordmark > span {
+  color: var(--accent);
+}
+.board-header,
+.viewer-memo .board-header,
+.personal-topbar + .board-header {
+  padding: 24px 0 26px;
+}
+.board-header h1 {
+  margin-bottom: 12px;
+  font-size: clamp(30px, 5vw, 42px);
+  line-height: 1.15;
+  font-weight: 500;
+  letter-spacing: -1.5px;
+  overflow-wrap: anywhere;
+}
+.topbar,
+.personal-topbar {
+  min-height: 48px;
+  height: auto;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 10px;
+}
+.updated {
+  font-size: 12px;
+}
+.redaction-toggle {
+  border-radius: 100px;
+  font-size: 11px;
+}
+.redaction-toggle[aria-pressed="true"] {
+  color: var(--accent);
+  background: var(--wash);
+}
+.task-section {
+  margin-bottom: 28px;
+}
+.section-heading {
+  margin-bottom: 5px;
+  min-height: 36px;
+}
+.section-heading h2 {
+  font-size: 14px;
+  letter-spacing: -0.2px;
+  text-transform: none;
+  font-weight: 600;
+}
+.section-count {
+  min-width: 26px;
+  height: 24px;
+  border-radius: 100px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.task-row {
+  border-bottom-color: var(--line);
+}
+.task-title {
+  letter-spacing: -0.25px;
+  line-height: 1.45;
+}
+.status-circle {
+  width: 18px;
+  height: 18px;
+}
+.status-circle.done {
+  border-color: transparent;
+}
+.task-title-button,
+.icon-button,
+.text-button {
+  transition:
+    color 140ms,
+    background 140ms;
+}
+.task-row:not(.editing):hover .status-button .status-circle {
+  border-color: var(--accent);
+}
+.row-menu {
+  border-radius: 16px;
+  padding: 6px;
+  box-shadow:
+    0 4px 12px var(--shadow),
+    0 16px 40px var(--shadow);
+}
+.row-menu button {
+  border-radius: 10px;
+}
+.editing {
+  border-radius: 12px;
+}
+.primary-action,
+.solid-button,
+.save-button {
+  color: var(--button-ink);
+  background: linear-gradient(180deg, var(--wash), var(--button));
+  border: 1px solid var(--button-edge);
+  box-shadow:
+    inset 0 1px 0 var(--bevel),
+    0 2px 3px var(--shadow);
+  transition:
+    background 160ms,
+    box-shadow 160ms,
+    transform 160ms;
+}
+.primary-action:hover:not(:disabled),
+.solid-button:hover:not(:disabled),
+.save-button:hover:not(:disabled) {
+  background: var(--button-hover);
+  box-shadow:
+    inset 0 1px 0 var(--bevel),
+    0 3px 8px var(--shadow);
+}
+.primary-action:active:not(:disabled),
+.solid-button:active:not(:disabled),
+.save-button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+.save-button {
+  border-radius: 9px;
+}
+.add-area {
+  border-radius: 18px;
+  border-color: var(--button-edge);
+  box-shadow:
+    inset 0 1px 0 var(--bevel),
+    0 6px 32px var(--shadow);
+}
+.add-button {
+  color: var(--accent);
+  font-weight: 550;
+  min-height: 56px;
+  border-radius: 17px;
+  gap: 12px;
+}
+.add-button > svg {
+  background: var(--wash);
+  width: 30px;
+  height: 30px;
+  padding: 5px;
+  border-radius: 9px;
+}
+.appearance-control {
+  border-radius: 100px;
+  background: var(--field);
+  border: 1px solid var(--line);
+}
+.appearance-control button {
+  border-radius: 100px;
+}
+.appearance-control button[aria-pressed="true"] {
+  box-shadow: 0 1px 4px var(--shadow);
+}
+.memo-footer {
+  font-size: 11px;
+}
+.memo-sheet {
+  border-radius: 24px;
+  padding: 24px;
+  box-shadow: 0 18px 80px var(--shadow);
+}
+.memo-sheet::backdrop {
+  background: #10203055;
+}
+.sheet-heading h2 {
+  font-weight: 550;
+  letter-spacing: -0.7px;
+}
+.email-form input,
+.partner-field input,
+.login-form input {
+  background: var(--field);
+  border-color: var(--line);
+  border-radius: 12px;
+}
+.access-page {
+  padding: 32px;
+  max-width: 420px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  box-shadow: 0 16px 60px var(--shadow);
+}
+.access-page > svg {
+  color: var(--accent);
+  background: var(--wash);
+  box-sizing: content-box;
+  padding: 14px;
+  border-radius: 16px;
+  margin-bottom: 24px;
+}
+.access-page h1 {
+  font-weight: 500;
+}
+.back-link {
+  text-underline-offset: 4px;
+}
+.home-shell {
+  max-width: 880px;
+  padding: 0 38px 24px;
+}
+.home-nav {
+  min-height: 88px;
+}
+.home-nav > .text-button {
+  border: 1px solid var(--line);
+  border-radius: 100px;
+  padding: 0 18px;
+  background: var(--surface);
+  color: var(--ink);
+}
+.home-nav > .text-button:hover {
+  background: var(--hover);
+}
+.wordmark {
+  font-size: 27px;
+  font-weight: 650;
+}
+.home-hero {
+  text-align: center;
+  padding: 48px 0 24px;
+}
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 12px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 100px;
+  text-transform: none;
+  font-size: 11px;
+  letter-spacing: 0;
+  font-weight: 500;
+}
+.eyebrow-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+.home-hero h1 {
+  font-size: clamp(44px, 7vw, 68px);
+  font-weight: 500;
+  line-height: 1.03;
+  letter-spacing: -2.6px;
+  margin: 24px 0 20px;
+}
+.home-hero > p:not(.home-caption):not(.draft-error) {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 18px;
+  line-height: 1.6;
+  letter-spacing: -0.2px;
+}
+.home-hero .home-caption {
+  font-size: 12px;
+  margin-top: 16px;
+}
+.create-board {
+  min-height: 50px;
+  border-radius: 12px;
+  margin-top: 12px;
+  padding-inline: 20px;
+}
+.create-board > svg:last-child {
+  width: 15px;
+}
+.home-example {
+  width: min(100%, 520px);
+  align-self: center;
+  margin: 12px 0 52px;
+  padding: 22px 24px 14px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  box-shadow:
+    0 2px 4px var(--shadow),
+    0 18px 50px -18px var(--shadow);
+}
+.example-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  font-size: 18px;
+  font-weight: 550;
+  letter-spacing: -0.5px;
+  margin-bottom: 14px;
+}
+.example-label {
+  font-family: ui-monospace, monospace;
+  color: var(--muted);
+  font-size: 9px;
+  letter-spacing: 1px;
+  font-weight: 400;
+}
+.example-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 58px;
+  padding: 10px 0;
+  font-size: 13px;
+  border-top: 1px solid var(--line);
+}
+.example-row > span:nth-child(2) {
+  flex: 1;
+  min-width: 0;
+}
+.example-row small {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+  margin-top: 3px;
+}
+.example-status {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid var(--control-border);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+}
+.example-status.waiting {
+  border-style: dashed;
+  border-color: var(--waiting);
+}
+.example-status.done {
+  border-color: transparent;
+  background: var(--done-fill);
+  color: var(--accent);
+}
+.example-state {
+  font-size: 10px;
+  color: var(--muted);
+}
+.example-done {
+  color: var(--done);
+}
+.recent-boards {
+  width: min(100%, 660px);
+  align-self: center;
+}
+.recent-boards h2 {
+  font-size: 16px;
+  font-weight: 550;
+  margin-bottom: 12px;
+}
+.recent-board {
+  background: var(--surface);
+  margin-bottom: 8px;
+  padding: 14px 18px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  min-height: 80px;
+}
+.recent-board > .board-number {
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  background: var(--wash);
+  color: var(--accent);
+  border-radius: 8px;
+  padding: 9px;
+  letter-spacing: 0.3px;
+}
+.home-footer {
+  padding-top: 16px;
+}
+.home-footer .legacy-entry {
+  width: auto;
+  margin-left: 6px;
+}
+.has-boards .home-hero {
+  text-align: left;
+  padding: 30px 0 32px;
+  width: min(100%, 660px);
+  align-self: center;
+}
+.has-boards .home-hero h1 {
+  font-size: 40px;
+  letter-spacing: -1.5px;
+}
+.has-boards .home-hero > p:not(.home-caption):not(.draft-error) {
+  display: none;
+}
+.has-boards .home-hero .eyebrow {
+  display: none;
+}
+@media (max-width: 600px) {
+  .memo-shell {
+    width: calc(100% - 24px);
+    margin: 16px auto 20px;
+    padding: 12px 20px 18px;
+    border-radius: 20px;
+  }
+  .board-header,
+  .viewer-memo .board-header,
+  .personal-topbar + .board-header {
+    padding: 22px 0;
+  }
+  .board-header h1 {
+    letter-spacing: -1.1px;
+  }
+  .memo-signature {
+    margin-bottom: 14px;
+    font-size: 15px;
+  }
+  .personal-topbar {
+    gap: 7px;
+  }
+  .row-tools {
+    margin-right: -10px;
+  }
+  .redaction-toggle {
+    min-width: 82px;
+    padding-inline: 8px;
+  }
+  .header-meta {
+    gap: 4px;
+  }
+  .updated {
+    font-size: 11px;
+  }
+  .add-area {
+    width: calc(100% - 32px);
+  }
+  .home-shell {
+    padding: 0 24px 24px;
+  }
+  .home-nav {
+    min-height: 76px;
+  }
+  .home-hero {
+    padding-top: 34px;
+  }
+  .home-hero h1 {
+    letter-spacing: -1.8px;
+  }
+  .home-example {
+    padding: 18px 18px 10px;
+    margin-bottom: 34px;
+  }
+  .example-state {
+    display: none;
+  }
+  .home-footer {
+    gap: 8px;
+  }
+  .home-footer > span {
+    flex: 1 1 100%;
+  }
+  .home-footer .appearance-control {
+    margin-left: 0;
+  }
+  .home-footer .legacy-entry {
+    margin-left: auto;
+  }
+  .recent-board {
+    gap: 12px;
+    padding: 14px 12px;
+  }
+  .has-boards .home-hero h1 {
+    font-size: 34px;
+  }
+  .access-page {
+    padding: 28px 24px;
+    margin-block: 12vh;
+  }
+  .memo-sheet {
+    padding: 22px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .primary-action:active:not(:disabled),
+  .solid-button:active:not(:disabled),
+  .save-button:active:not(:disabled) {
+    transform: none;
+  }
+}
