@@ -1,0 +1,498 @@
+"use client";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  ArrowRight,
+  Plus,
+  Mail,
+  ChevronRight,
+  Check,
+  Link2,
+} from "lucide-react";
+import { AppearanceControl } from "./appearance-control";
+import { MemoBoard } from "./memo-board";
+import { MagicLinkForm } from "./magic-link-form";
+import { Sheet } from "./sheet";
+import { memoRequest } from "@/lib/client-api";
+import {
+  currentCode,
+  navigate,
+  CODE,
+  boardUrl,
+  basePath,
+} from "@/lib/navigation";
+import { cloudClient, emailEnabled } from "@/lib/cloud";
+import type { Board } from "@/lib/types";
+
+export function LittleBoardApp() {
+  const [code, setCode] = useState<string | null>(null),
+    [board, setBoard] = useState<Board | null>(null),
+    [boards, setBoards] = useState<Board[]>([]);
+  const [email, setEmail] = useState<string | null>(null),
+    [ready, setReady] = useState(emailEnabled),
+    [login, setLogin] = useState(false),
+    [busy, setBusy] = useState(false),
+    [opening, setOpening] = useState(false),
+    [error, setError] = useState("");
+  const [sheet, setSheet] = useState<"claim" | "share" | null>(null),
+    [partner, setPartner] = useState(""),
+    [message, setMessage] = useState(""),
+    [sheetError, setSheetError] = useState("");
+  const requestId = useRef<string | null>(null),
+    generation = useRef(0);
+  const load = useCallback(async () => {
+    const version = ++generation.current;
+    const selected = currentCode();
+    setCode(selected);
+    setOpening(Boolean(selected));
+    setError("");
+    try {
+      const info = await memoRequest("/api/memos");
+      if (version !== generation.current) return;
+      setBoards(info.boards);
+      setEmail(info.email);
+      setReady(info.emailReady);
+      if (info.warning) setError(info.warning);
+      if (selected) {
+        const loaded = await memoRequest(`/api/memos/${selected}`);
+        if (version !== generation.current) return;
+        setBoard(loaded);
+        setPartner(loaded.invited_email || "");
+      } else setBoard(null);
+    } catch (e) {
+      if (version === generation.current) {
+        setError((e as Error).message);
+        setBoard(null);
+      }
+    } finally {
+      if (version === generation.current) setOpening(false);
+    }
+  }, []);
+  useEffect(() => {
+    const query = new URLSearchParams(window.location.search);
+    const returned = query.get("board"),
+      route = query.get("route");
+    const restored =
+      returned && CODE.test(returned)
+        ? returned
+        : route && CODE.test(route)
+          ? route
+          : null;
+    const authError =
+      query.get("error_description") ||
+      new URLSearchParams(window.location.hash.slice(1)).get(
+        "error_description",
+      );
+    // Supabase owns the code exchange. Wait for its session before cleaning the callback URL.
+    async function bootstrap() {
+      const result = emailEnabled
+        ? await cloudClient().auth.getSession()
+        : null;
+      const signedIn = result?.data.session;
+      const failedCallback = Boolean(
+        authError ||
+        result?.error ||
+        (emailEnabled && query.has("code") && !signedIn),
+      );
+      if (restored) window.history.replaceState(null, "", boardUrl(restored));
+      else if (query.has("welcome") || query.has("code") || authError)
+        window.history.replaceState(null, "", boardUrl());
+      await load();
+      if (returned && restored && signedIn && !failedCallback) {
+        const current = await memoRequest(`/api/memos/${restored}`);
+        if (!current.claimed) setSheet("claim");
+      }
+      if (failedCallback) {
+        setLogin(true);
+        setError(
+          "That sign-in link expired or has already been used. Request a new one.",
+        );
+      }
+    }
+    void bootstrap().catch(() => {
+      setError(
+        "That link couldn’t be opened. Please request a new sign-in link.",
+      );
+    });
+    const routeChanged = () => {
+      setLogin(false);
+      setSheet(null);
+      void load();
+    };
+    window.addEventListener("popstate", routeChanged);
+    const changedElsewhere = (event: StorageEvent) => {
+      if (event.key === "little-board:guests:v1" && !currentCode()) void load();
+    };
+    window.addEventListener("storage", changedElsewhere);
+    const subscription = emailEnabled
+      ? cloudClient().auth.onAuthStateChange((event) => {
+          if (["SIGNED_IN", "SIGNED_OUT"].includes(event))
+            setTimeout(() => void load(), 0);
+        }).data.subscription
+      : null;
+    return () => {
+      generation.current++;
+      subscription?.unsubscribe();
+      window.removeEventListener("popstate", routeChanged);
+      window.removeEventListener("storage", changedElsewhere);
+    };
+  }, [load]);
+  async function create() {
+    if (busy) return;
+    setBusy(true);
+    setError("");
+    requestId.current ||= crypto.randomUUID();
+    try {
+      const result = await memoRequest("/api/memos", {
+        requestId: requestId.current,
+      });
+      requestId.current = null;
+      navigate(result.code);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function claim() {
+    if (!code || busy) return;
+    setBusy(true);
+    setSheetError("");
+    try {
+      const result = await memoRequest(`/api/memos/${code}/claim`, {});
+      setSheet(null);
+      navigate(result.code);
+    } catch (e) {
+      setSheetError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  const brand = (
+    <button
+      className="little-brand"
+      onClick={() => {
+        setLogin(false);
+        navigate();
+      }}
+      aria-label="Little Board home"
+    >
+      <span className="brand-glyph" aria-hidden="true">
+        <i />
+        <i />
+        <i />
+      </span>
+      little <strong>board</strong>
+      <span className="brand-period">.</span>
+    </button>
+  );
+  if (code && opening)
+    return (
+      <main className="little-opening">
+        {brand}
+        <p role="status">Opening your board…</p>
+      </main>
+    );
+  if (code && board)
+    return (
+      <>
+        <div className="board-brand-bar">
+          <span className="little-brand">{brand.props.children}</span>
+        </div>
+        <MemoBoard
+          key={`${board.id}:${board.claimed}:${board.invited_email}`}
+          initial={board}
+          mode={board.access || "owner"}
+          personalActions={{
+            onClaim: () => {
+              setSheetError("");
+              setMessage("");
+              setSheet("claim");
+            },
+            onShare: () => {
+              setSheetError("");
+              setMessage("");
+              setSheet("share");
+            },
+          }}
+        />
+        {sheet && (
+          <Sheet
+            title={
+              sheet === "claim" || !board.claimed
+                ? "Keep it with you."
+                : "Share with one person."
+            }
+            onClose={() => {
+              if (!busy) setSheet(null);
+            }}
+          >
+            {!board.claimed ? (
+              <>
+                <p className="sheet-copy">
+                  Save this board to your email to open it on your other
+                  devices.
+                </p>
+                {email ? (
+                  <>
+                    <p className="form-hint">Save to {email}.</p>
+                    <button
+                      className="little-primary"
+                      disabled={busy}
+                      onClick={() => void claim()}
+                    >
+                      {busy ? "Saving…" : "Save my board"}
+                      <ArrowRight size={17} />
+                    </button>
+                  </>
+                ) : (
+                  <MagicLinkForm code={code} ready={ready} />
+                )}
+              </>
+            ) : (
+              <>
+                <p className="sheet-copy">
+                  They can read the board. You keep editing.
+                </p>
+                <form
+                  className="little-email"
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    setBusy(true);
+                    setSheetError("");
+                    setMessage("");
+                    try {
+                      const data = await memoRequest(
+                        `/api/memos/${code}/sharing`,
+                        { email: partner },
+                      );
+                      setBoard(data.board);
+                      setMessage(
+                        "Access saved. Copy the link and send it to them; they’ll sign in with this email.",
+                      );
+                    } catch (e) {
+                      setSheetError((e as Error).message);
+                    } finally {
+                      setBusy(false);
+                    }
+                  }}
+                >
+                  <label htmlFor="partner-email">Their email</label>
+                  <input
+                    id="partner-email"
+                    type="email"
+                    required
+                    value={partner}
+                    maxLength={254}
+                    disabled={busy}
+                    onChange={(e) => setPartner(e.target.value)}
+                    placeholder="them@example.com"
+                  />
+                  <button
+                    type="submit"
+                    className="little-primary"
+                    disabled={busy}
+                  >
+                    {busy ? "Saving…" : "Give view access"}
+                    <ArrowRight size={17} />
+                  </button>
+                </form>
+                {board.invited_email && (
+                  <div className="share-secondary">
+                    <button
+                      className="text-button"
+                      onClick={async () => {
+                        try {
+                          await navigator.clipboard.writeText(
+                            new URL(boardUrl(code), window.location.origin)
+                              .href,
+                          );
+                          setMessage("Board link copied.");
+                        } catch {
+                          setMessage(
+                            new URL(boardUrl(code), window.location.origin)
+                              .href,
+                          );
+                        }
+                      }}
+                    >
+                      <Link2 size={16} />
+                      Copy link
+                    </button>
+                    <button
+                      className="text-button danger-text"
+                      disabled={busy}
+                      onClick={async () => {
+                        setBusy(true);
+                        try {
+                          const data = await memoRequest(
+                            `/api/memos/${code}/sharing`,
+                            { email: null },
+                          );
+                          setBoard(data.board);
+                          setPartner("");
+                          setMessage("Sharing stopped.");
+                        } catch (e) {
+                          setSheetError((e as Error).message);
+                        } finally {
+                          setBusy(false);
+                        }
+                      }}
+                    >
+                      Stop sharing
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+            {message && (
+              <p className="form-hint" role="status">
+                {message}
+              </p>
+            )}
+            {sheetError && (
+              <p className="draft-error" role="alert">
+                {sheetError}
+              </p>
+            )}
+          </Sheet>
+        )}
+      </>
+    );
+  return (
+    <main className="little-home">
+      <nav className="little-nav" aria-label="Main">
+        {brand}
+        <AppearanceControl />
+      </nav>
+      <section className={`little-welcome${login || code ? " is-login" : ""}`}>
+        <div className="little-kicker">
+          <span />
+          {login || code ? "WELCOME BACK" : "ONE LITTLE BOARD"}
+        </div>
+        <h1>
+          {login || code ? (
+            <>
+              Your boards.
+              <br />
+              <span>Just an email away.</span>
+            </>
+          ) : (
+            <>
+              A little less
+              <br />
+              <span>to remember.</span>
+            </>
+          )}
+        </h1>
+        <p className="little-intro">
+          {login || code
+            ? "A link in your inbox. No password to remember."
+            : "A calm place for what’s next. Start on your own, or share with someone."}
+        </p>
+        {error && (
+          <p className="draft-error" role="alert">
+            {error}
+          </p>
+        )}
+        {login || code ? (
+          <MagicLinkForm
+            code={code || undefined}
+            ready={ready}
+            onBack={() => {
+              setLogin(false);
+              navigate();
+            }}
+          />
+        ) : (
+          <>
+            <div className="opening-actions">
+              <button
+                className="little-primary"
+                onClick={() => void create()}
+                disabled={busy}
+              >
+                <Plus size={20} />
+                {busy ? "Creating…" : "Create board"}
+                <ArrowRight size={18} />
+              </button>
+              {!email && (
+                <button
+                  className="little-secondary"
+                  onClick={() => setLogin(true)}
+                >
+                  <Mail size={18} />
+                  Sign in with email
+                </button>
+              )}
+            </div>
+            <p className="little-caption">
+              Start without signing in. Save to your email whenever you’re
+              ready.
+            </p>
+            <div className="little-statuses" aria-label="Three simple sections">
+              <span>
+                <i />
+                Pending
+              </span>
+              <span>
+                <i className="waiting" />
+                Waiting
+              </span>
+              <span>
+                <Check size={14} />
+                Done
+              </span>
+            </div>
+          </>
+        )}
+      </section>
+      {!login && !code && boards.length > 0 && (
+        <section className="little-recents" aria-label="Your boards">
+          <h2>Pick up where you left off</h2>
+          {boards.map((b) => (
+            <button
+              className="little-recent"
+              key={b.id}
+              onClick={() => navigate(b.code)}
+            >
+              <span className="recent-number">{b.code}</span>
+              <span>
+                <strong>{b.title}</strong>
+                <small>
+                  {b.access === "viewer"
+                    ? "Shared with you"
+                    : b.claimed
+                      ? "Saved to your email"
+                      : "Saved on this device"}
+                </small>
+              </span>
+              <ChevronRight size={18} />
+            </button>
+          ))}
+        </section>
+      )}
+      <footer className="little-footer">
+        <span>Small lists. A clearer head.</span>
+        {email && (
+          <button
+            className="text-button"
+            disabled={busy}
+            onClick={async () => {
+              setBusy(true);
+              try {
+                await memoRequest("/api/email", { action: "logout" });
+                await load();
+              } catch (e) {
+                setError((e as Error).message);
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            Sign out · {email}
+          </button>
+        )}
+      </footer>
+    </main>
+  );
+}
