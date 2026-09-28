@@ -12,8 +12,9 @@ This is the fresh successor to Shared memo. No old tasks, names, admin passwords
 - Pending, Waiting, Done, 24-hour archiving, Undo, quick add and light/night appearance are retained.
 - Magic-link sign-in, cloud persistence and one-person read-only sharing are implemented.
 - The Supabase database is provisioned, with owner-only writes and invited-email reads. The browser uses only the publishable key in `lib/backend.json`.
-- Live email delivery is **not enabled**. New sign-ups, SMTP delivery and allowed callback URLs still need configuration. See [email setup](handbook/email-setup.md).
-- Publishing uses **Sites**, with static output in `out/`. The Sites identity lives in `.openai/hosting.json`. There is no Vercel dependency.
+- Live email delivery is **not enabled** until Brevo SMTP, new sign-ups and the GitHub Pages callback URL are configured. See [email setup](handbook/email-setup.md).
+- The live app is on [GitHub Pages](https://leolunelove.github.io/little-board/), built from this repository. There is no Vercel dependency.
+
 
 ## Local preview
 
@@ -51,7 +52,7 @@ Giving someone view access does not send an invitation email automatically. The 
 
 ## Deployment
 
-See [the release steps](handbook/deployment.md). Sites publishes a saved source version and its matching `out/` archive. The optional GitHub Pages workflow runs manually only. Static hosts need an SPA fallback for numeric board paths. GitHub Pages uses the generated `404.html` to return to the app and restore the path. On a custom-domain root, leave `NEXT_PUBLIC_BASE_PATH` empty.
+See [the release steps](handbook/deployment.md). The GitHub Pages workflow runs manually and builds static output in `out/`. Static hosts need an SPA fallback for numeric board paths. GitHub Pages uses the generated `404.html` to return to the app and restore the path. On a custom-domain root, leave `NEXT_PUBLIC_BASE_PATH` empty.
 
 ## Validation
 
