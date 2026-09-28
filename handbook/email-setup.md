@@ -1,41 +1,27 @@
 # Enable magic-link sign-in
 
-Guest boards already work without a backend. The database is provisioned. Email sign-in is implemented but deliberately disabled until sign-ups, return URLs and the sending service are configured. No test or preview should say an email was sent unless Supabase accepted the request.
+Little Board is live at https://leolunelove.github.io/little-board/. Guest boards already work. The database and magic-link code are ready; email stays off until the sender and callbacks are configured.
 
-## Database
+## Brevo sender
 
-`supabase/migrations/001_little_board.sql` was applied on 26 September 2026 to the existing `shared-memo` project as `little_board_private_storage`. Do not apply it again to that project. It created a new `little_boards` table and the unexposed `little_private` helper schema without changing the previous Shared memo tables. The follow-up `retire_shared_memo_access` migration disables the retired app’s read/edit RPC endpoints while preserving its data. Only confirmed email users may create cloud boards. Owners may edit; the single invited email may read; outsiders and anonymous database callers have no access.
+1. In Brevo, verify the sender you will use and generate an SMTP key under **Settings → SMTP & API → SMTP**. Use an SMTP key, not an API key.
+2. In Supabase project `erygwkyjqtmmuucwnrds`, open **Authentication → Emails → SMTP Settings**. Enable custom SMTP and use host `smtp-relay.brevo.com`, port `587`, the SMTP login displayed by Brevo, and the SMTP key as password. Set sender name **Little Board** and the From address to the verified sender.
+3. Keep the SMTP key inside Supabase. Never add it to this repository, GitHub variables, or the browser build. Disable click tracking for authentication emails so links are not rewritten.
 
-## Email sender
+The default Supabase sender only sends to project team members. Do not launch public sign-in with it.
 
-In Supabase **Authentication → Email / SMTP settings**, connect a verified SMTP sender. A provider such as Resend supplies the SMTP host, port, username, and password after its sending domain is verified. Keep the SMTP password in Supabase only, never in this source or frontend environment.
+## Supabase Auth
 
-The default Supabase sender is limited to authorized project-team addresses and is not suitable for general visitors. Do not enable the public login flow on that default sender.
+Under **Authentication → Sign In / Providers**, enable new user sign-ups, leave email confirmation on, and keep anonymous sign-ins off. The app uses magic links, with no password form. Set the Magic Link and Confirm Signup email templates to `supabase/templates/magic-link.html`, retaining `{{ .ConfirmationURL }}`.
 
-Set the sender name to **Little Board**. Use `supabase/templates/magic-link.html` for the Magic Link template, and for signup confirmation if that template is used for first-time email users. Both must retain `{{ .ConfirmationURL }}`. Enable **Allow new users to sign up** and keep email confirmation enabled. The public Auth settings currently report `disable_signup: true`, so this change is required for first-time visitors. No password signup form is used by the app.
+Under **Authentication → URL Configuration**, set the Site URL to `https://leolunelove.github.io/little-board/` and allow `https://leolunelove.github.io/little-board/**` as a redirect URL. Remove the old Vercel callback after confirming nothing else needs it.
 
-## Return address
+## Publish and verify
 
-The current Site URL must be `https://little-board.leolunelove.chatgpt.site/`. Set Supabase's Site URL to that root. Add that exact root to the redirect allow-list, including any GitHub Pages project path and a trailing slash. Allow the app's `?welcome=1` and `?welcome=1&board=123456` redirects; use `https://little-board.leolunelove.chatgpt.site/**` for the current live site. Do not allow arbitrary domains. Add `http://127.0.0.1:3211/**` only for local development.
+The source includes only a public Supabase URL and publishable key in `lib/backend.json`. Set GitHub repository variable `EMAIL_ENABLED=true`, then run **Publish Little Board** in Actions. No SMTP secret goes into GitHub.
 
-The app uses Supabase PKCE. Ask recipients to open the link in the browser where they requested it. A used or expired link should offer a fresh sign-in request. If they requested the link while saving a guest board, the app returns to that board and asks them to confirm saving it to the verified email.
+Create a guest board, request a link, open it in the same browser, claim the board, and confirm it opens after signing in on another device. Invite a second email as reader and confirm it cannot edit. Check that a wrong email receives no board data.
 
-## Build settings
+Supabase database migration `001_little_board.sql` and the Shared memo retirement migration were already applied on 26 September 2026; do not rerun them.
 
-`lib/backend.json` contains the live Supabase URL and a publishable key only; neither is a secret. Environment values override these defaults. Never put a service-role or SMTP key there. Email remains off unless `NEXT_PUBLIC_EMAIL_ENABLED=true` is explicitly set for the frontend build.
-
-For local development, set overrides in `.env.local`. For GitHub Actions, add repository variables:
-
-| Variable | Value |
-| --- | --- |
-| `SUPABASE_URL` | Your project HTTPS API URL |
-| `SUPABASE_PUBLISHABLE_KEY` | The publishable key, never a service-role key |
-| `EMAIL_ENABLED` | `true`, after completing the steps above |
-
-The workflow sets the public base path to the repository name and maps these variables to the frontend's `NEXT_PUBLIC_` settings. Email-disabled builds can contain the publishable database configuration but never service credentials or old board tokens.
-
-## Verify before release
-
-Use an owner and a second test email. Create a guest board, add an item, request a link, open it, and save the board to the verified email. Open a second browser, sign in, and confirm the same board appears. Give the second email view access, copy its link, and verify that account cannot write through either the interface or the database API. Check wrong-account, expired-link and used-link behavior, then sign out. This real mail-and-browser round trip remains required even when the automated tests pass.
-
-References: [Supabase magic links](https://supabase.com/docs/guides/auth/auth-email-passwordless), [custom SMTP](https://supabase.com/docs/guides/auth/auth-smtp).
+References: [Supabase magic links](https://supabase.com/docs/guides/auth/auth-email-passwordless), [custom SMTP](https://supabase.com/docs/guides/auth/auth-smtp), [Brevo SMTP](https://help.brevo.com/hc/en-us/articles/7924908994450-Send-transactional-emails-using-Brevo-SMTP).
