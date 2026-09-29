@@ -122,8 +122,8 @@
 }
 :root.theme-changing {
   transition:
-    --paper 380ms ease-in-out,
-    --sky 380ms ease-in-out;
+    --paper 180ms ease-out,
+    --sky 180ms ease-out;
 }
 :root.theme-changing body,
 :root.theme-changing body *,
@@ -131,8 +131,8 @@
 :root.theme-changing body *::after {
   transition-property:
     color, background-color, border-color, box-shadow, fill, stroke !important;
-  transition-duration: 380ms !important;
-  transition-timing-function: ease-in-out !important;
+  transition-duration: 180ms !important;
+  transition-timing-function: ease-out !important;
 }
 * {
   box-sizing: border-box;
