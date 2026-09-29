@@ -12,6 +12,7 @@ import {
 export function AppearanceControl() {
   const [appearance, setAppearance] = useState<Appearance>("light");
   const chosen = useRef<Appearance | null>(null);
+  const transitionTimer = useRef<number | null>(null);
 
   useEffect(() => {
     const media = window.matchMedia?.("(prefers-color-scheme: dark)");
@@ -30,12 +31,27 @@ export function AppearanceControl() {
     media?.addEventListener("change", sync);
     window.addEventListener("storage", onStorage);
     return () => {
+      if (transitionTimer.current !== null)
+        window.clearTimeout(transitionTimer.current);
+      document.documentElement.classList.remove("theme-changing");
       media?.removeEventListener("change", sync);
       window.removeEventListener("storage", onStorage);
     };
   }, []);
 
   function choose(next: Appearance) {
+    if (next === appearance) return;
+    if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      document.documentElement.classList.add("theme-changing");
+      // Let the transition rule take effect before changing the theme tokens.
+      void document.documentElement.offsetWidth;
+      if (transitionTimer.current !== null)
+        window.clearTimeout(transitionTimer.current);
+      transitionTimer.current = window.setTimeout(() => {
+        document.documentElement.classList.remove("theme-changing");
+        transitionTimer.current = null;
+      }, 220);
+    }
     chosen.current = next;
     setAppearance(next);
     applyAppearance(next);

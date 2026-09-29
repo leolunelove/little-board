@@ -21,7 +21,29 @@ import {
   basePath,
 } from "@/lib/navigation";
 import { cloudClient, emailEnabled } from "@/lib/cloud";
+import { isArchived } from "@/lib/archive";
 import type { Board } from "@/lib/types";
+
+function boardSummary(board: Board) {
+  const visible = board.tasks.filter((task) => !isArchived(task));
+  return {
+    pending: visible.filter((task) => task.status === "pending").length,
+    waiting: visible.filter((task) => task.status === "waiting").length,
+    done: visible.filter((task) => task.status === "done").length,
+  };
+}
+
+function updatedLabel(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Recently updated";
+  const today = new Date();
+  if (date.toDateString() === today.toDateString()) return "Updated today";
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+  if (date.toDateString() === yesterday.toDateString())
+    return "Updated yesterday";
+  return `Updated ${date.toLocaleDateString(undefined, { month: "short", day: "numeric" })}`;
+}
 
 export function LittleBoardApp() {
   const [code, setCode] = useState<string | null>(null),
@@ -167,6 +189,7 @@ export function LittleBoardApp() {
       setBusy(false);
     }
   }
+  const signedInHome = Boolean(email && !login && !code);
   const brand = (
     <button
       className="little-brand"
@@ -359,120 +382,225 @@ export function LittleBoardApp() {
       </>
     );
   return (
-    <main className="little-home">
+    <main className={`little-home${signedInHome ? " is-dashboard" : ""}`}>
       <nav className="little-nav" aria-label="Main">
         {brand}
         <AppearanceControl />
       </nav>
-      <section className={`little-welcome${login || code ? " is-login" : ""}`}>
-        <div className="little-kicker">
-          <span />
-          {login || code ? "WELCOME BACK" : "ONE LITTLE BOARD"}
-        </div>
-        <h1>
-          {login || code ? (
-            <>
-              Your boards.
-              <br />
-              <span>Just an email away.</span>
-            </>
-          ) : (
-            <>
-              A little less
-              <br />
-              <span>to remember.</span>
-            </>
-          )}
-        </h1>
-        <p className="little-intro">
-          {login || code
-            ? "A link in your inbox. No password to remember."
-            : "A calm place for what’s next. Start on your own, or share with someone."}
-        </p>
-        {error && (
-          <p className="draft-error" role="alert">
-            {error}
-          </p>
-        )}
-        {login || code ? (
-          <MagicLinkForm
-            code={code || undefined}
-            ready={ready}
-            onBack={() => {
-              setLogin(false);
-              navigate();
-            }}
-          />
-        ) : (
-          <>
-            <div className="opening-actions">
+      {signedInHome ? (
+        <>
+          <section
+            className="little-dashboard-intro"
+            aria-labelledby="boards-title"
+          >
+            <div className="little-kicker">
+              <span />
+              WELCOME BACK
+            </div>
+            <div className="little-dashboard-heading">
+              <div>
+                <h1 id="boards-title">Your boards</h1>
+                <p>Everything you’re keeping track of, in one place.</p>
+              </div>
               <button
-                className="little-primary"
+                className="little-primary dashboard-new-button"
                 onClick={() => void create()}
                 disabled={busy}
               >
-                <Plus size={20} />
-                {busy ? "Creating…" : "Create board"}
-                <ArrowRight size={18} />
+                <Plus size={18} />
+                {busy ? "Creating…" : "New board"}
               </button>
-              {!email && (
-                <button
-                  className="little-secondary"
-                  onClick={() => setLogin(true)}
-                >
-                  <Mail size={18} />
-                  Sign in with email
-                </button>
-              )}
             </div>
-            <p className="little-caption">
-              Start without signing in. Save to your email whenever you’re
-              ready.
+          </section>
+          {error && (
+            <p className="draft-error" role="alert">
+              {error}
             </p>
-            <div className="little-statuses" aria-label="Three simple sections">
-              <span>
-                <i />
-                Pending
-              </span>
-              <span>
-                <i className="waiting" />
-                Waiting
-              </span>
-              <span>
-                <Check size={14} />
-                Done
-              </span>
-            </div>
-          </>
-        )}
-      </section>
-      {!login && !code && boards.length > 0 && (
-        <section className="little-recents" aria-label="Your boards">
-          <h2>Pick up where you left off</h2>
-          {boards.map((b) => (
-            <button
-              className="little-recent"
-              key={b.id}
-              onClick={() => navigate(b.code)}
-            >
-              <span className="recent-number">{b.code}</span>
-              <span>
-                <strong>{b.title}</strong>
-                <small>
-                  {b.access === "viewer"
-                    ? "Shared with you"
-                    : b.claimed
-                      ? "Saved to your email"
-                      : "Saved on this device"}
-                </small>
-              </span>
-              <ChevronRight size={18} />
+          )}
+          <section className="little-dashboard-boards" aria-label="Your boards">
+            {boards.length ? (
+              boards.map((b) => {
+                const counts = boardSummary(b);
+                return (
+                  <button
+                    className="little-board-summary"
+                    key={b.id}
+                    onClick={() => navigate(b.code)}
+                  >
+                    <span className="summary-topline">
+                      <span className="summary-mark" aria-hidden="true">
+                        ≡
+                      </span>
+                      <strong>{b.title}</strong>
+                      <span className="summary-code">#{b.code}</span>
+                    </span>
+                    <span className="summary-divider" />
+                    <span className="summary-caption">AT A GLANCE</span>
+                    <span className="summary-counts">
+                      <span>
+                        <i className="summary-status" />
+                        {counts.pending} pending
+                      </span>
+                      <span>
+                        <i className="summary-status waiting" />
+                        {counts.waiting} waiting
+                      </span>
+                      <span>
+                        <Check size={17} aria-hidden="true" />
+                        {counts.done} done
+                      </span>
+                    </span>
+                    <span className="summary-bottomline">
+                      <span>
+                        {b.access === "viewer" ? "Shared with you · " : ""}
+                        {updatedLabel(b.updated_at)}
+                      </span>
+                      <span className="summary-open">
+                        Open board <ArrowRight size={16} aria-hidden="true" />
+                      </span>
+                    </span>
+                  </button>
+                );
+              })
+            ) : (
+              <p className="little-dashboard-empty">
+                Your first board is just one click away.
+              </p>
+            )}
+          </section>
+          <section
+            className="little-dashboard-create"
+            aria-label="Create another board"
+          >
+            <h2>Make another space</h2>
+            <p>A fresh board for a new project or person.</p>
+            <button onClick={() => void create()} disabled={busy}>
+              <Plus size={19} aria-hidden="true" />
+              <span>{busy ? "Creating…" : "Create another board"}</span>
+              <ArrowRight size={18} aria-hidden="true" />
             </button>
-          ))}
-        </section>
+          </section>
+        </>
+      ) : (
+        <>
+          <section
+            className={`little-welcome${login || code ? " is-login" : ""}`}
+          >
+            <div className="little-kicker">
+              <span />
+              {login || code ? "WELCOME BACK" : "ONE LITTLE BOARD"}
+            </div>
+            <h1>
+              {login || code ? (
+                <>
+                  Your boards.
+                  <br />
+                  <span>Just an email away.</span>
+                </>
+              ) : (
+                <>
+                  A little less
+                  <br />
+                  <span>to remember.</span>
+                </>
+              )}
+            </h1>
+            <p className="little-intro">
+              {login || code
+                ? "A link in your inbox. No password to remember."
+                : "A calm place for what’s next. Start on your own, or share with someone."}
+            </p>
+            {error && (
+              <p className="draft-error" role="alert">
+                {error}
+              </p>
+            )}
+            {login || code ? (
+              <MagicLinkForm
+                code={code || undefined}
+                ready={ready}
+                onBack={() => {
+                  setLogin(false);
+                  navigate();
+                }}
+              />
+            ) : (
+              <>
+                <div className="opening-actions">
+                  <button
+                    className="little-primary"
+                    onClick={() => void create()}
+                    disabled={busy}
+                  >
+                    <Plus size={20} />
+                    {busy ? "Creating…" : "Create board"}
+                    <ArrowRight size={18} />
+                  </button>
+                  {!email && (
+                    <button
+                      className="little-secondary"
+                      onClick={() => setLogin(true)}
+                    >
+                      <Mail size={18} />
+                      Sign in with email
+                    </button>
+                  )}
+                </div>
+                <p className="little-caption">
+                  Start without signing in. Save to your email whenever you’re
+                  ready.
+                </p>
+                <div
+                  className="little-statuses"
+                  aria-label="Three simple sections"
+                >
+                  <span>
+                    <i />
+                    Pending
+                  </span>
+                  <span>
+                    <i className="waiting" />
+                    Waiting
+                  </span>
+                  <span>
+                    <Check size={14} />
+                    Done
+                  </span>
+                </div>
+              </>
+            )}
+          </section>
+          {!login && !code && boards.length > 0 && (
+            <section className="little-recents" aria-label="Your boards">
+              <h2>Pick up where you left off</h2>
+              {boards.map((b) => (
+                <button
+                  className="little-recent"
+                  key={b.id}
+                  onClick={() => navigate(b.code)}
+                >
+                  <span className="recent-number">{b.code}</span>
+                  <span>
+                    <strong>{b.title}</strong>
+                    <small>
+                      {b.access === "viewer"
+                        ? "Shared with you"
+                        : b.claimed
+                          ? "Saved to your email"
+                          : "Saved on this device"}
+                    </small>
+                  </span>
+                  <ChevronRight size={18} />
+                </button>
+              ))}
+            </section>
+          )}
+        </>
       )}
       <footer className="little-footer">
-        <span>Small lists. A clearer head.</span>
+        <span>
+          {email ? `Signed in as ${email}` : "Small lists. A clearer head."}
+        </span>
         {email && (
           <button
             className="text-button"
@@ -489,7 +617,7 @@ export function LittleBoardApp() {
               }
             }}
           >
-            Sign out · {email}
+            Sign out
           </button>
         )}
       </footer>
