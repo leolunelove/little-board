@@ -6,7 +6,8 @@ import { applyCommand, randomCode } from "./local-boards";
 import backend from "./backend.json";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL || backend.url;
-const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || backend.publishableKey;
+const key =
+  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || backend.publishableKey;
 export const emailEnabled = Boolean(
   url && key && process.env.NEXT_PUBLIC_EMAIL_ENABLED === "true",
 );
@@ -96,10 +97,10 @@ export async function cloudList() {
   if (!user) return [];
   const { data, error } = await cloudClient()
     .from("little_boards")
-    .select("id,code,title,owner_id,viewer_email,updated_at")
+    .select("id,code,title,owner_id,viewer_email,updated_at,tasks")
     .order("updated_at", { ascending: false });
   dbError(error);
-  return (data || []).map((row) => payload({ ...row, tasks: [] }, user.id));
+  return (data || []).map((row) => payload(row, user.id));
 }
 export async function cloudRead(code: string) {
   const user = await account();
