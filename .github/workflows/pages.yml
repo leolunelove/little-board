@@ -22,7 +22,6 @@ jobs:
       - run: pnpm test
       - run: pnpm build
         env:
-          NEXT_PUBLIC_BASE_PATH: /${{ github.event.repository.name }}
           NEXT_PUBLIC_SUPABASE_URL: ${{ vars.SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY }}
           NEXT_PUBLIC_EMAIL_ENABLED: ${{ vars.EMAIL_ENABLED }}
