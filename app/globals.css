@@ -1,3 +1,13 @@
+@property --paper {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #f3f6fa;
+}
+@property --sky {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #dcebf9;
+}
 :root {
   --button-edge: #aac5e0;
   --bevel: #ffffff;
@@ -109,6 +119,20 @@
     --toast-hover: #ffffff15;
     color-scheme: dark;
   }
+}
+:root.theme-changing {
+  transition:
+    --paper 380ms ease-in-out,
+    --sky 380ms ease-in-out;
+}
+:root.theme-changing body,
+:root.theme-changing body *,
+:root.theme-changing body *::before,
+:root.theme-changing body *::after {
+  transition-property:
+    color, background-color, border-color, box-shadow, fill, stroke !important;
+  transition-duration: 380ms !important;
+  transition-timing-function: ease-in-out !important;
 }
 * {
   box-sizing: border-box;
