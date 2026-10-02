@@ -264,6 +264,7 @@ test("failed inline saves across sections preserve the editor, note, and selecte
   ui.fireEvent.change(ui.screen.getByRole("textbox", { name: "Item title" }), {
     target: { value: "Revised title" },
   });
+  ui.fireEvent.click(ui.screen.getByRole("button", { name: "Add details" }));
   ui.fireEvent.change(ui.screen.getByRole("textbox", { name: "Short note" }), {
     target: { value: "Revised note" },
   });
@@ -713,6 +714,7 @@ test("switching tasks keeps an unsaved edit and Cancel deliberately discards it"
   ui.fireEvent.change(ui.screen.getByRole("textbox", { name: "Item title" }), {
     target: { value: "Unfinished wording" },
   });
+  ui.fireEvent.click(ui.screen.getByRole("button", { name: "Add details" }));
   ui.fireEvent.change(ui.screen.getByRole("textbox", { name: "Short note" }), {
     target: { value: "Keep this detail" },
   });
@@ -728,6 +730,7 @@ test("switching tasks keeps an unsaved edit and Cancel deliberately discards it"
       .value,
     "Unfinished wording",
   );
+  ui.fireEvent.click(ui.screen.getByRole("button", { name: "Add details" }));
   assert.equal(
     (
       ui.screen.getByRole("textbox", {
@@ -752,4 +755,38 @@ test("switching tasks keeps an unsaved edit and Cancel deliberately discards it"
       .value,
     task.title,
   );
+});
+
+test("inline title saves on leaving the form, ignores internal focus, and Escape cancels", async () => {
+  const saves: Partial<Task>[] = [];
+  let cancelled = 0;
+  ui.render(
+    createElement(TaskEditor, {
+      task,
+      onCancel() {
+        cancelled++;
+      },
+      async onSave(patch) {
+        saves.push(patch);
+        return true;
+      },
+    }),
+  );
+  const input = ui.screen.getByRole("textbox", { name: "Item title" });
+  assert.equal(ui.screen.queryByRole("textbox", { name: "Short note" }), null);
+  ui.fireEvent.change(input, { target: { value: "Edited inline" } });
+  ui.fireEvent.blur(input, {
+    relatedTarget: ui.screen.getByRole("button", { name: "Add details" }),
+  });
+  assert.equal(saves.length, 0);
+  await ui.act(async () => {
+    ui.fireEvent.blur(input, { relatedTarget: document.body });
+  });
+  assert.equal(saves.length, 1);
+  assert.equal(saves[0].title, "Edited inline");
+  ui.fireEvent.change(input, { target: { value: "Discard me" } });
+  ui.fireEvent.keyDown(input, { key: "Escape" });
+  ui.fireEvent.blur(input, { relatedTarget: document.body });
+  assert.equal(cancelled, 1);
+  assert.equal(saves.length, 1);
 });
