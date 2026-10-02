@@ -30,11 +30,12 @@ export function TaskEditor({
   const [assigned, setAssigned] = useState(
     draft ? draft.assigned_to || "" : task?.assigned_to || "",
   );
-  const [details, setDetails] = useState(Boolean(task));
+  const [details, setDetails] = useState(false);
   const [saving, setSaving] = useState(false);
   const [failed, setFailed] = useState(false);
   const id = useRef(task?.id || crypto.randomUUID());
   const submitting = useRef(false);
+  const cancelled = useRef(false);
   const input = useRef<HTMLInputElement>(null);
   const dirty = Boolean(title || note || assigned || status !== "pending");
   useEffect(() => {
@@ -59,14 +60,41 @@ export function TaskEditor({
         : null,
     );
   }, [task, title, note, status, assigned, onDraftChange]);
+  const changed =
+    !task ||
+    title !== task.title ||
+    note !== task.note ||
+    status !== task.status ||
+    assigned !== (task.assigned_to || "");
+  function cancel() {
+    cancelled.current = true;
+    onCancel();
+  }
   const locked = saving || busy;
   return (
     <form
       className={`task-editor${task ? "" : " quick-add"}`}
       aria-label={task ? "Edit item" : "Add item"}
+      onBlur={(event) => {
+        if (!task || cancelled.current || locked || failed) return;
+        if (
+          event.relatedTarget instanceof Node &&
+          event.currentTarget.contains(event.relatedTarget)
+        )
+          return;
+        if (!changed) {
+          cancel();
+          return;
+        }
+        if (title.trim()) event.currentTarget.requestSubmit();
+      }}
       onSubmit={async (event) => {
         event.preventDefault();
         if (!title.trim() || locked || submitting.current) return;
+        if (!changed) {
+          cancel();
+          return;
+        }
         submitting.current = true;
         setSaving(true);
         setFailed(false);
@@ -102,7 +130,10 @@ export function TaskEditor({
         }
       }}
       onKeyDown={(event) => {
-        if (event.key === "Escape" && !locked) onCancel();
+        if (event.key === "Escape" && !locked) {
+          event.preventDefault();
+          cancel();
+        }
       }}
     >
       <div className="editor-title-line">
@@ -173,7 +204,7 @@ export function TaskEditor({
         </p>
       )}
       <div className="editor-bottom">
-        {!task && (
+        {
           <button
             type="button"
             className="text-button"
@@ -184,13 +215,16 @@ export function TaskEditor({
             <ChevronDown size={13} />
             {details ? "Less detail" : "Add details"}
           </button>
-        )}
+        }
         <span className="editor-spacer" />
         <button
           type="button"
           className="text-button"
           disabled={locked}
-          onClick={onCancel}
+          onPointerDown={() => {
+            cancelled.current = true;
+          }}
+          onClick={cancel}
         >
           {task || dirty ? "Cancel" : "Done adding"}
         </button>

@@ -279,7 +279,7 @@ export function MemoBoard({
       setFresh(true);
       if (fromEditor) {
         rememberDraft(task.id, null);
-        setEditing(null);
+        setEditing((current) => (current === task.id ? null : current));
       }
     }
     return ok;
@@ -656,11 +656,18 @@ export function MemoBoard({
           <div className="updated" aria-live="polite" suppressHydrationWarning>
             {busy ? (
               "Saving…"
+            ) : error && writable ? (
+              "Not saved · please retry"
             ) : !fresh ? (
               "Offline · reconnecting…"
             ) : (
               <>
                 <span className="sync-dot" />
+                {writable && !demo
+                  ? initial.code && !board.claimed
+                    ? "Saved on this device · "
+                    : "Saved · "
+                  : ""}
                 Updated{" "}
                 {sameDay
                   ? ""
@@ -812,7 +819,7 @@ export function MemoBoard({
                   </span>
                   <span className="drag-preview-caption">
                     {destination
-                      ? `Move to ${labels[destination.status]}`
+                      ? `Move to ${labels[destination.status]}${destination.beforeId ? " · before " + (board.tasks.find((item) => item.id === destination.beforeId)?.title || "item") : " · at the end"}`
                       : "Drag to a position"}
                   </span>
                 </span>
