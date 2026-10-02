@@ -1604,3 +1604,34 @@ h1 {
     gap: 15px;
   }
 }
+
+/* Keep the target spacious while the exact insertion line stays visible. */
+.task-row {
+  transition: padding-top 140ms ease-out;
+}
+.task-row.drop-before {
+  padding-top: 24px;
+}
+.task-section.drop-at-end {
+  padding-bottom: 24px;
+}
+.task-section {
+  transition: padding-bottom 140ms ease-out;
+}
+.drop-before::before {
+  top: 8px;
+  left: 30px;
+}
+.drop-at-end::after {
+  bottom: 8px;
+  left: 30px;
+}
+.task-row.editing .editor-title-line {
+  min-height: 44px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .task-row,
+  .task-section {
+    transition: none;
+  }
+}
