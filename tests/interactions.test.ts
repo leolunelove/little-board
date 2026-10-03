@@ -7,6 +7,7 @@ import type { Board, Task } from "../lib/types";
 
 let ui: typeof import("@testing-library/react");
 let MemoBoard: typeof import("../components/memo-board").MemoBoard;
+let PasteRequest: typeof import("../components/paste-request").PasteRequest;
 let TaskEditor: typeof import("../components/task-editor").TaskEditor;
 let useMemoMutations: typeof import("../components/use-memo-mutations").useMemoMutations;
 let UNDO_MS: number;
@@ -79,9 +80,16 @@ before(async () => {
         : 0;
     },
   });
+  dom.window.HTMLDialogElement.prototype.showModal = function () {
+    this.setAttribute("open", "");
+  };
+  dom.window.HTMLDialogElement.prototype.close = function () {
+    this.removeAttribute("open");
+  };
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   ui = await import("@testing-library/react");
   ({ MemoBoard } = await import("../components/memo-board"));
+  ({ PasteRequest } = await import("../components/paste-request"));
   ({ TaskEditor } = await import("../components/task-editor"));
   ({ useMemoMutations, UNDO_MS } =
     await import("../components/use-memo-mutations"));
@@ -828,4 +836,174 @@ test("unchanged edits stay quiet and a corrected failed draft saves with the key
   });
   assert.equal(attempts, 2);
   assert.equal(patches[1].title, "Corrected wording");
+});
+
+test("paste review edits wording, removes suggestions, groups a checklist and keeps a failed draft for retry", async () => {
+  const submissions: Partial<Task>[][] = [];
+  let closed = 0;
+  ui.render(
+    createElement(PasteRequest, {
+      onClose() {
+        closed++;
+      },
+      async onAdd(items) {
+        submissions.push(items);
+        return submissions.length > 1;
+      },
+    }),
+  );
+  ui.fireEvent.change(
+    ui.screen.getByRole("textbox", { name: "Client request" }),
+    {
+      target: {
+        value: "Menu changes:\n- Change prices\n- New photo\n- Export PDF",
+      },
+    },
+  );
+  ui.fireEvent.click(ui.screen.getByRole("button", { name: "Review items" }));
+  assert.equal(submissions.length, 0);
+  ui.fireEvent.change(
+    ui.screen.getByRole("textbox", { name: "Suggested item 1" }),
+    { target: { value: "Update menu prices" } },
+  );
+  ui.fireEvent.click(
+    ui.screen.getByRole("button", { name: "Remove suggested item 2" }),
+  );
+  ui.fireEvent.click(ui.screen.getByRole("button", { name: "One checklist" }));
+  await ui.act(async () => {
+    ui.fireEvent.click(
+      ui.screen.getByRole("button", { name: "Add checklist" }),
+    );
+  });
+  assert.equal(closed, 0);
+  assert.ok(ui.screen.getByRole("alert"));
+  assert.equal(submissions[0].length, 1);
+  assert.equal(submissions[0][0].title, "Menu changes");
+  assert.deepEqual(
+    submissions[0][0].checklist!.map((item) => item.title),
+    ["Update menu prices", "Export PDF"],
+  );
+  assert.match(submissions[0][0].original_request!, /New photo/);
+  await ui.act(async () => {
+    ui.fireEvent.click(
+      ui.screen.getByRole("button", { name: "Add checklist" }),
+    );
+  });
+  assert.equal(closed, 1);
+  assert.deepEqual(submissions[0], submissions[1]);
+});
+
+test("checklist progress can be edited by owners and is read-only for viewers", async () => {
+  const grouped: Task = {
+    ...task,
+    checklist: [
+      {
+        id: "12345678-1234-4123-8123-123456789014",
+        title: "Update prices",
+        done: false,
+      },
+    ],
+    original_request: "Please update the prices.",
+  };
+  let view = ui.render(
+    createElement(MemoBoard, {
+      initial: { ...initial, tasks: [grouped] },
+      mode: "owner",
+      demo: true,
+    }),
+  );
+  view.container.querySelector(".task-checklist")!.setAttribute("open", "");
+  await ui.act(async () => {
+    ui.fireEvent.click(
+      ui.screen.getByRole("checkbox", { name: "Complete step: Update prices" }),
+    );
+  });
+  assert.equal(
+    (
+      ui.screen.getByRole("checkbox", {
+        name: "Complete step: Update prices",
+      }) as HTMLInputElement
+    ).checked,
+    true,
+  );
+  assert.ok(ui.screen.getByText("1 of 1 done"));
+  assert.ok(ui.screen.getByRole("button", { name: `Complete ${task.title}` }));
+  view.unmount();
+  view = ui.render(
+    createElement(MemoBoard, {
+      initial: { ...initial, tasks: [grouped] },
+      mode: "viewer",
+      demo: true,
+    }),
+  );
+  view.container.querySelector(".task-checklist")!.setAttribute("open", "");
+  assert.ok(ui.screen.getByText("Update prices"));
+  assert.equal(ui.screen.queryByRole("checkbox"), null);
+  assert.equal(
+    ui.screen.queryByRole("button", { name: "Paste a request" }),
+    null,
+  );
+  assert.equal(ui.screen.queryByRole("button", { name: "Add item" }), null);
+});
+
+test("editing a grouped task preserves its checklist and original message", async () => {
+  const checklist = [
+    {
+      id: "12345678-1234-4123-8123-123456789014",
+      title: "Update prices",
+      done: true,
+    },
+  ];
+  let saved: Partial<Task> = {};
+  ui.render(
+    createElement(TaskEditor, {
+      task: { ...task, checklist, original_request: "Original message" },
+      onCancel() {},
+      async onSave(patch) {
+        saved = patch;
+        return true;
+      },
+    }),
+  );
+  ui.fireEvent.change(ui.screen.getByRole("textbox", { name: "Item title" }), {
+    target: { value: "Menu changes" },
+  });
+  await ui.act(async () => {
+    ui.fireEvent.submit(ui.screen.getByRole("form", { name: "Edit item" }));
+  });
+  assert.deepEqual(saved.checklist, checklist);
+  assert.equal(saved.original_request, "Original message");
+});
+
+test("a lost batch response reconciles every imported task including checklist and source", async () => {
+  const imported = {
+    ...task,
+    id: "12345678-1234-4123-8123-123456789015",
+    title: "Menu",
+    checklist: [
+      {
+        id: "12345678-1234-4123-8123-123456789014",
+        title: "Prices",
+        done: false,
+      },
+    ],
+    original_request: "Menu changes: prices",
+  };
+  let writes = 0;
+  globalThis.fetch = async (_url, init) => {
+    if (init?.method === "POST") {
+      writes++;
+      throw new TypeError("lost response");
+    }
+    return response({ ...initial, tasks: [...initial.tasks, imported] });
+  };
+  const { result } = ui.renderHook(() => useMemoMutations(initial, false));
+  let ok = false;
+  await ui.act(async () => {
+    ok = await result.current.change("add_many", { tasks: [imported] });
+  });
+  assert.equal(ok, true);
+  assert.equal(writes, 1);
+  assert.equal(result.current.board.tasks.length, 2);
+  assert.deepEqual(result.current.board.tasks[1].checklist, imported.checklist);
 });
