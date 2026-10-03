@@ -472,6 +472,7 @@ export function MemoBoard({
                   onCancel={() => {
                     rememberDraft(task.id, null);
                     setEditing(null);
+                    setError("");
                   }}
                   onSave={(patch, fromEditor) =>
                     update(task, patch, fromEditor)
@@ -497,7 +498,7 @@ export function MemoBoard({
                       ? "No archived items yet."
                       : activeId
                         ? "Drop here"
-                        : "Completed items will appear here."}
+                        : "Completed items stay here for 24 hours, then move to Archived."}
               </p>
             )}
           </Section>
@@ -668,7 +669,7 @@ export function MemoBoard({
                     ? "Saved on this device · "
                     : "Saved · "
                   : ""}
-                Updated{" "}
+                {writable && !demo ? "" : "Updated "}
                 {sameDay
                   ? ""
                   : date.toLocaleDateString([], {

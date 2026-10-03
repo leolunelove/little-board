@@ -62,8 +62,8 @@ export function TaskEditor({
   }, [task, title, note, status, assigned, onDraftChange]);
   const changed =
     !task ||
-    title !== task.title ||
-    note !== task.note ||
+    title.trim() !== task.title ||
+    note.trim() !== task.note ||
     status !== task.status ||
     assigned !== (task.assigned_to || "");
   function cancel() {
@@ -73,7 +73,7 @@ export function TaskEditor({
   const locked = saving || busy;
   return (
     <form
-      className={`task-editor${task ? "" : " quick-add"}`}
+      className={`task-editor${task ? "" : " quick-add"}${details ? " details-open" : ""}`}
       aria-label={task ? "Edit item" : "Add item"}
       onBlur={(event) => {
         if (!task || cancelled.current || locked || failed) return;
@@ -132,7 +132,15 @@ export function TaskEditor({
       onKeyDown={(event) => {
         if (event.key === "Escape" && !locked) {
           event.preventDefault();
+          event.stopPropagation();
           cancel();
+        } else if (
+          event.key === "Enter" &&
+          (event.metaKey || event.ctrlKey) &&
+          !event.nativeEvent.isComposing
+        ) {
+          event.preventDefault();
+          event.currentTarget.requestSubmit();
         }
       }}
     >
@@ -144,8 +152,15 @@ export function TaskEditor({
           aria-label="Item title"
           placeholder={task ? "What needs to happen?" : "Add an item…"}
           value={title}
-          onChange={(event) => setTitle(event.target.value)}
+          onChange={(event) => {
+            setTitle(event.target.value);
+            setFailed(false);
+          }}
           maxLength={240}
+          autoComplete="off"
+          autoCapitalize="sentences"
+          enterKeyHint={task ? "done" : "enter"}
+          spellCheck
           required
           readOnly={locked}
         />
@@ -169,8 +184,11 @@ export function TaskEditor({
             aria-label="Short note"
             placeholder="Add a short note…"
             value={note}
-            rows={3}
-            onChange={(event) => setNote(event.target.value)}
+            rows={2}
+            onChange={(event) => {
+              setNote(event.target.value);
+              setFailed(false);
+            }}
             maxLength={400}
             readOnly={locked}
           />
@@ -204,26 +222,22 @@ export function TaskEditor({
         </p>
       )}
       <div className="editor-bottom">
-        {
-          <button
-            type="button"
-            className="text-button"
-            aria-expanded={details}
-            disabled={locked}
-            onClick={() => setDetails(!details)}
-          >
-            <ChevronDown size={13} />
-            {details ? "Less detail" : "Add details"}
-          </button>
-        }
+        <button
+          type="button"
+          className="text-button"
+          aria-expanded={details}
+          disabled={locked}
+          onClick={() => setDetails(!details)}
+        >
+          <ChevronDown size={13} />
+          {details ? "Less detail" : "Add details"}
+        </button>
         <span className="editor-spacer" />
         <button
           type="button"
           className="text-button"
           disabled={locked}
-          onPointerDown={() => {
-            cancelled.current = true;
-          }}
+          onPointerDown={(event) => event.preventDefault()}
           onClick={cancel}
         >
           {task || dirty ? "Cancel" : "Done adding"}
@@ -232,7 +246,7 @@ export function TaskEditor({
           <button
             className="save-button"
             type="submit"
-            disabled={!title.trim() || locked}
+            disabled={!title.trim() || locked || (!changed && !failed)}
           >
             {saving ? "Saving…" : failed ? "Retry" : "Save"}
           </button>
