@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown, Plus } from "lucide-react";
+import { ChevronDown, Plus, X } from "lucide-react";
 import type { Task, Status } from "@/lib/types";
 
 export function TaskEditor({
@@ -30,6 +30,10 @@ export function TaskEditor({
   const [assigned, setAssigned] = useState(
     draft ? draft.assigned_to || "" : task?.assigned_to || "",
   );
+  const [checklist, setChecklist] = useState(
+    draft?.checklist ?? task?.checklist ?? [],
+  );
+  const originalRequest = draft?.original_request ?? task?.original_request;
   const [details, setDetails] = useState(false);
   const [saving, setSaving] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -37,7 +41,14 @@ export function TaskEditor({
   const submitting = useRef(false);
   const cancelled = useRef(false);
   const input = useRef<HTMLInputElement>(null);
-  const dirty = Boolean(title || note || assigned || status !== "pending");
+  const dirty = Boolean(
+    title || note || assigned || checklist.length || status !== "pending",
+  );
+  const checklistChanged =
+    JSON.stringify(checklist) !== JSON.stringify(task?.checklist || []);
+  const checklistValid = checklist.every(
+    (step) => step.title.trim() && step.title.trim().length <= 240,
+  );
   useEffect(() => {
     onDirtyChange?.(dirty);
   }, [dirty, onDirtyChange]);
@@ -47,25 +58,37 @@ export function TaskEditor({
       title !== task.title ||
       note !== task.note ||
       status !== task.status ||
-      assigned !== (task.assigned_to || "");
+      assigned !== (task.assigned_to || "") ||
+      checklistChanged;
     onDraftChange(
       task.id,
       changed
         ? {
             title,
             note,
+            checklist,
             status,
             assigned_to: (assigned as Task["assigned_to"]) || null,
           }
         : null,
     );
-  }, [task, title, note, status, assigned, onDraftChange]);
+  }, [
+    task,
+    title,
+    note,
+    status,
+    assigned,
+    checklist,
+    checklistChanged,
+    onDraftChange,
+  ]);
   const changed =
     !task ||
     title.trim() !== task.title ||
     note.trim() !== task.note ||
     status !== task.status ||
-    assigned !== (task.assigned_to || "");
+    assigned !== (task.assigned_to || "") ||
+    checklistChanged;
   function cancel() {
     cancelled.current = true;
     onCancel();
@@ -86,11 +109,12 @@ export function TaskEditor({
           cancel();
           return;
         }
-        if (title.trim()) event.currentTarget.requestSubmit();
+        if (title.trim() && checklistValid) event.currentTarget.requestSubmit();
       }}
       onSubmit={async (event) => {
         event.preventDefault();
-        if (!title.trim() || locked || submitting.current) return;
+        if (!title.trim() || !checklistValid || locked || submitting.current)
+          return;
         if (!changed) {
           cancel();
           return;
@@ -103,6 +127,13 @@ export function TaskEditor({
           ok = await onSave(
             {
               title: title.trim(),
+              checklist: checklist.map((step) => ({
+                ...step,
+                title: step.title.trim(),
+              })),
+              ...(originalRequest !== undefined
+                ? { original_request: originalRequest }
+                : {}),
               note: note.trim(),
               status,
               assigned_to: (assigned as Task["assigned_to"]) || null,
@@ -122,6 +153,7 @@ export function TaskEditor({
         if (!task) {
           setTitle("");
           setNote("");
+          setChecklist([]);
           setStatus("pending");
           setAssigned("");
           setDetails(false);
@@ -168,7 +200,7 @@ export function TaskEditor({
           <button
             className="save-button"
             type="submit"
-            disabled={!title.trim() || locked}
+            disabled={!title.trim() || !checklistValid || locked}
           >
             {saving ? "Adding…" : failed ? "Retry" : "Add"}
           </button>
@@ -192,6 +224,56 @@ export function TaskEditor({
             maxLength={400}
             readOnly={locked}
           />
+          <div className="editor-checklist">
+            {checklist.map((step, index) => (
+              <div className="editor-step" key={step.id}>
+                <input
+                  aria-label={`Checklist step ${index + 1}`}
+                  placeholder="What needs to happen?"
+                  value={step.title}
+                  maxLength={240}
+                  readOnly={locked}
+                  onChange={(event) => {
+                    setChecklist((current) =>
+                      current.map((item) =>
+                        item.id === step.id
+                          ? { ...item, title: event.target.value }
+                          : item,
+                      ),
+                    );
+                    setFailed(false);
+                  }}
+                />
+                <button
+                  type="button"
+                  className="icon-button"
+                  aria-label={`Remove checklist step ${index + 1}`}
+                  disabled={locked}
+                  onClick={() =>
+                    setChecklist((current) =>
+                      current.filter((item) => item.id !== step.id),
+                    )
+                  }
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            ))}
+            <button
+              type="button"
+              className="text-button"
+              disabled={locked || checklist.length >= 20}
+              onClick={() =>
+                setChecklist((current) => [
+                  ...current,
+                  { id: crypto.randomUUID(), title: "", done: false },
+                ])
+              }
+            >
+              <Plus size={14} />
+              {checklist.length ? "Add step" : "Add a checklist"}
+            </button>
+          </div>
           <div className="editor-fields">
             <select
               aria-label="Item status"
@@ -246,7 +328,12 @@ export function TaskEditor({
           <button
             className="save-button"
             type="submit"
-            disabled={!title.trim() || locked || (!changed && !failed)}
+            disabled={
+              !title.trim() ||
+              !checklistValid ||
+              locked ||
+              (!changed && !failed)
+            }
           >
             {saving ? "Saving…" : failed ? "Retry" : "Save"}
           </button>

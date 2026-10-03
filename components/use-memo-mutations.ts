@@ -82,7 +82,10 @@ export function useMemoMutations(initial: Board, demo: boolean) {
         } catch (e) {
           // A lost response can follow a successful add/delete. Reconcile by the
           // existing task UUID before retrying, so quick-add never creates a twin.
-          if (!demo && (action === "add" || action === "delete")) {
+          if (
+            !demo &&
+            (action === "add" || action === "add_many" || action === "delete")
+          ) {
             try {
               const response = await transport.request(readPath, {
                 cache: "no-store",
@@ -93,16 +96,32 @@ export function useMemoMutations(initial: Board, demo: boolean) {
                 const saved = current.tasks.find(
                   (task) => task.id === (expected?.id || payload.id),
                 );
-                if (
-                  (action === "delete" && !saved) ||
-                  (action === "add" &&
+                const equivalent = (saved: Task | undefined, expected: Task) =>
+                  Boolean(
                     saved &&
-                    expected &&
-                    ["title", "note", "status", "assigned_to"].every(
+                    [
+                      "title",
+                      "note",
+                      "status",
+                      "assigned_to",
+                      "checklist",
+                      "original_request",
+                    ].every(
                       (key) =>
-                        saved[key as keyof Task] ===
-                        expected[key as keyof Task],
-                    ))
+                        JSON.stringify(saved[key as keyof Task]) ===
+                        JSON.stringify(expected[key as keyof Task]),
+                    ),
+                  );
+                if (
+                  (action === "add_many" &&
+                    (payload.tasks as Task[]).every((expected) =>
+                      equivalent(
+                        current.tasks.find((task) => task.id === expected.id),
+                        expected,
+                      ),
+                    )) ||
+                  (action === "delete" && !saved) ||
+                  (action === "add" && expected && equivalent(saved, expected))
                 ) {
                   setBoard(current);
                   return true;

@@ -232,6 +232,7 @@ export function LittleBoardApp() {
               setSheet("claim");
             },
             onShare: () => {
+              setPartner(board.invited_email || "");
               setSheetError("");
               setMessage("");
               setSheet("share");
@@ -274,7 +275,25 @@ export function LittleBoardApp() {
             ) : (
               <>
                 <p className="sheet-copy">
-                  They can read the board. You keep editing.
+                  One person can view this board. Only you can make changes.
+                </p>
+                <div className="access-summary" aria-label="Board access">
+                  <div>
+                    <span>You</span>
+                    <span className="access-role">Can edit</span>
+                  </div>
+                  <div>
+                    <span>{board.invited_email || "Just you for now"}</span>
+                    <span className="access-role">
+                      {board.invited_email ? "Can view" : "Private"}
+                    </span>
+                  </div>
+                </div>
+                <p className="form-hint">
+                  {board.invited_email
+                    ? "View access is enabled. Send them the board link; they’ll sign in with the email shown above."
+                    : "Add their email, then copy and send them the link. They’ll sign in with that email."}{" "}
+                  An invitation email isn’t sent automatically.
                 </p>
                 <form
                   className="little-email"
@@ -299,7 +318,9 @@ export function LittleBoardApp() {
                     }
                   }}
                 >
-                  <label htmlFor="partner-email">Their email</label>
+                  <label htmlFor="partner-email">
+                    {board.invited_email ? "Viewer’s email" : "Their email"}
+                  </label>
                   <input
                     id="partner-email"
                     type="email"
@@ -315,7 +336,11 @@ export function LittleBoardApp() {
                     className="little-primary"
                     disabled={busy}
                   >
-                    {busy ? "Saving…" : "Give view access"}
+                    {busy
+                      ? "Saving…"
+                      : board.invited_email
+                        ? "Update view access"
+                        : "Give view access"}
                     <ArrowRight size={17} />
                   </button>
                 </form>

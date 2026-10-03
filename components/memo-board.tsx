@@ -42,11 +42,14 @@ import {
   LogOut,
   Eye,
   EyeOff,
+  ClipboardPaste,
 } from "lucide-react";
 import type { Board, Task, Status, Mode } from "@/lib/types";
 import { isArchived } from "@/lib/archive";
 import { RedactedText } from "@/components/redacted-text";
 import { TaskEditor } from "@/components/task-editor";
+import { PasteRequest, type ImportedItem } from "@/components/paste-request";
+import { TaskChecklist } from "@/components/task-checklist";
 import { TaskNote } from "@/components/task-note";
 import { AppearanceControl } from "@/components/appearance-control";
 import { useComposerDock } from "@/components/use-composer-dock";
@@ -102,6 +105,7 @@ export function MemoBoard({
   } = useMemoMutations(initial, demo);
   const [editing, setEditing] = useState<string | null>(null),
     [adding, setAdding] = useState(false),
+    [pasting, setPasting] = useState(false),
     [notice, setNotice] = useState(""),
     [share, setShare] = useState(false),
     [link, setLink] = useState(""),
@@ -199,6 +203,7 @@ export function MemoBoard({
         inFlight.current ||
         editing ||
         addDirty ||
+        pasting ||
         activeId
       )
         return;
@@ -245,6 +250,7 @@ export function MemoBoard({
     writable,
     editing,
     addDirty,
+    pasting,
     activeId,
     inFlight,
     revision,
@@ -850,6 +856,8 @@ export function MemoBoard({
                   board_id: board.id,
                   title: patch.title!,
                   note: patch.note || "",
+                  checklist: patch.checklist,
+                  original_request: patch.original_request,
                   status: patch.status || "pending",
                   assigned_to: patch.assigned_to || null,
                   sort_order:
@@ -870,20 +878,74 @@ export function MemoBoard({
               }}
             />
           ) : (
-            <button
-              ref={addButtonRef}
-              className="add-button"
-              disabled={busy || Boolean(activeId)}
-              onClick={() => {
-                setEditing(null);
-                setAdding(true);
-              }}
-            >
-              <Plus size={20} />
-              Add item
-            </button>
+            <div className="add-actions">
+              <button
+                ref={addButtonRef}
+                className="add-button"
+                disabled={busy || Boolean(activeId)}
+                onClick={() => {
+                  setEditing(null);
+                  setAdding(true);
+                }}
+              >
+                <Plus size={20} />
+                Add item
+              </button>
+              <button
+                className="paste-button icon-button"
+                aria-label="Paste a request"
+                title="Paste a request"
+                disabled={busy || Boolean(activeId)}
+                onClick={() => {
+                  setError("");
+                  setPasting(true);
+                }}
+              >
+                <ClipboardPaste size={20} />
+              </button>
+            </div>
           )}
         </div>
+      )}
+      {pasting && writable && (
+        <PasteRequest
+          onClose={() => setPasting(false)}
+          onAdd={async (items: ImportedItem[]) => {
+            const stamp = new Date().toISOString();
+            const highest = Math.max(
+              0,
+              ...board.tasks.map((task) => task.sort_order),
+            );
+            const tasks: Task[] = items.map((item, index) => ({
+              ...item,
+              board_id: board.id,
+              note: "",
+              status: "pending",
+              assigned_to: null,
+              sort_order: highest + (index + 1) * 1024,
+              created_at: stamp,
+              updated_at: stamp,
+              completed_at: null,
+            }));
+            const ok = await change("add_many", { tasks }, (current) => ({
+              ...current,
+              tasks: [
+                ...current.tasks,
+                ...tasks.filter(
+                  (task) =>
+                    !current.tasks.some((existing) => existing.id === task.id),
+                ),
+              ],
+            }));
+            if (ok) {
+              setFresh(true);
+              setNotice(
+                `Added ${tasks.length === 1 ? (tasks[0].checklist?.length ? "a checklist" : "an item") : `${tasks.length} items`} to Pending`,
+              );
+            }
+            return ok;
+          }}
+        />
       )}
       {writable && (
         <button
@@ -1101,7 +1163,7 @@ function TaskRow({
         setNodeRef(node);
       }}
       data-task-id={task.id}
-      className={`task-row ${task.status} ${isDragging ? "dragging" : ""} ${editing ? "editing" : ""}${dropBefore ? " drop-before" : ""}`}
+      className={`task-row ${task.status} ${isDragging ? "dragging" : ""} ${editing ? "editing" : ""}${dropBefore ? " drop-before" : ""}${task.checklist?.length ? " task-card" : ""}`}
     >
       {writable ? (
         <button
@@ -1167,6 +1229,12 @@ function TaskRow({
                 onToggle={onToggleNote}
               />
             )}
+            <TaskChecklist
+              task={task}
+              writable={writable}
+              busy={busy}
+              onSave={onSave}
+            />
           </div>
           {task.assigned_to && task.status !== "done" && (
             <span className="assignee">

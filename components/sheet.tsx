@@ -17,6 +17,11 @@ export function Sheet({
     const dialog = ref.current!;
     const previous = document.activeElement as HTMLElement | null;
     dialog.showModal();
+    dialog
+      .querySelector<
+        HTMLInputElement | HTMLTextAreaElement
+      >("input:not([type=checkbox]), textarea")
+      ?.focus({ preventScroll: true });
     return () => {
       dialog.close();
       previous?.focus({ preventScroll: true });
