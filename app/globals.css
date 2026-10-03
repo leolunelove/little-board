@@ -1635,3 +1635,10 @@ h1 {
     transition: none;
   }
 }
+
+.task-row.editing .task-editor:not(.details-open) {
+  padding: 8px 0;
+}
+.task-row.editing .task-editor:not(.details-open) .editor-bottom {
+  margin-top: 4px;
+}
