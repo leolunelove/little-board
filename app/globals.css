@@ -1642,3 +1642,305 @@ h1 {
 .task-row.editing .task-editor:not(.details-open) .editor-bottom {
   margin-top: 4px;
 }
+
+/* Rich requests stay compact; ordinary tasks retain their simple row layout. */
+.add-actions {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+}
+.add-actions .add-button {
+  flex: 1;
+  width: auto;
+}
+.paste-button.icon-button {
+  width: 52px;
+  height: 52px;
+  flex: 0 0 52px;
+  border-radius: 12px;
+  color: var(--accent);
+}
+.paste-button:hover:not(:disabled) {
+  background: var(--hover);
+}
+.task-row.task-card {
+  background: var(--field);
+  border: 0;
+  border-radius: 14px;
+  padding: 0 12px;
+  margin: 8px 0;
+}
+.task-card .row-tools {
+  margin-right: 0;
+}
+.task-card .task-title {
+  font-weight: 550;
+}
+.task-card .task-copy {
+  padding-bottom: 12px;
+}
+.task-checklist {
+  margin-top: 3px;
+  font-size: 13px;
+}
+.task-checklist summary {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--muted);
+  cursor: pointer;
+  min-height: 32px;
+  list-style: none;
+}
+.task-checklist summary::-webkit-details-marker {
+  display: none;
+}
+.task-checklist summary > svg {
+  transition: transform 160ms ease;
+}
+.task-checklist[open] summary > svg {
+  transform: rotate(180deg);
+}
+.checklist-meter {
+  width: 48px;
+  height: 3px;
+  margin-left: 4px;
+  background: var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.checklist-meter > span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transition: width 180ms ease;
+}
+.task-checklist ul {
+  list-style: none;
+  padding: 4px 0;
+  margin: 0;
+}
+.checklist-step {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  line-height: 1.4;
+  padding: 5px 0;
+}
+label.checklist-step {
+  cursor: pointer;
+}
+.checklist-step input {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  inset: 0;
+  opacity: 0;
+  margin: 0;
+  cursor: pointer;
+}
+.checklist-step input:disabled {
+  cursor: default;
+}
+.step-circle {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  border: 1px solid var(--control-border);
+  border-radius: 5px;
+  display: grid;
+  place-items: center;
+  color: var(--accent);
+}
+.checklist-step input:focus-visible + .step-circle {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+}
+.step-done .step-circle {
+  background: var(--done-fill);
+}
+.step-done .checklist-step > span:last-child {
+  color: var(--muted);
+}
+.original-request {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 3px;
+}
+.original-request summary {
+  cursor: pointer;
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+}
+.original-request summary::before {
+  content: "＋";
+  margin-right: 5px;
+}
+.original-request[open] summary::before {
+  content: "−";
+}
+.original-request p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin: 6px 0;
+  line-height: 1.6;
+}
+.paste-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.paste-form > p {
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 0;
+}
+.paste-form textarea,
+.import-heading input,
+.editor-step input {
+  width: 100%;
+  min-width: 0;
+  padding: 12px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--field);
+  color: var(--ink);
+  font-size: 15px;
+  line-height: 1.5;
+  resize: vertical;
+}
+.import-choice {
+  display: flex;
+  padding: 4px;
+  border-radius: 12px;
+  background: var(--field);
+  gap: 4px;
+}
+.import-choice button {
+  flex: 1;
+  padding: 11px 6px;
+  border-radius: 9px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.import-choice button[aria-pressed="true"] {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 1px 4px var(--shadow);
+}
+.import-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.import-items {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.import-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+.import-item textarea {
+  flex: 1;
+}
+.import-index {
+  color: var(--muted);
+  font-size: 12px;
+  padding-top: 14px;
+  min-width: 18px;
+}
+.import-item .icon-button {
+  flex: 0 0 34px;
+  margin-top: 4px;
+}
+.source-choice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 13px;
+  min-height: 44px;
+}
+.source-choice input {
+  accent-color: var(--accent);
+  width: 18px;
+  height: 18px;
+}
+.import-bottom {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: space-between;
+}
+.import-bottom .primary-action {
+  font-size: 14px;
+  padding: 12px 16px;
+}
+.editor-checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 6px 0;
+}
+.editor-step {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.editor-step input {
+  padding: 9px 10px;
+  font-size: 14px;
+}
+.editor-step .icon-button {
+  flex: 0 0 34px;
+}
+.access-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 12px;
+  background: var(--field);
+  font-size: 14px;
+}
+.access-summary > div {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  justify-content: space-between;
+}
+.access-summary > div > span:first-child {
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.access-role {
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: 12px;
+}
+@media (max-width: 600px) {
+  .task-row.task-card {
+    padding: 0 8px;
+  }
+  .import-bottom {
+    flex-wrap: wrap;
+  }
+  .import-bottom .primary-action {
+    flex: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .checklist-meter > span,
+  .task-checklist summary > svg {
+    transition: none;
+  }
+}
