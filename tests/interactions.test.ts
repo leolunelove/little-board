@@ -790,3 +790,42 @@ test("inline title saves on leaving the form, ignores internal focus, and Escape
   assert.equal(cancelled, 1);
   assert.equal(saves.length, 1);
 });
+
+test("unchanged edits stay quiet and a corrected failed draft saves with the keyboard", async () => {
+  let attempts = 0;
+  const patches: Partial<Task>[] = [];
+  ui.render(
+    createElement(TaskEditor, {
+      task,
+      onCancel() {},
+      async onSave(patch) {
+        attempts++;
+        patches.push(patch);
+        return attempts > 1;
+      },
+    }),
+  );
+  const input = ui.screen.getByRole("textbox", { name: "Item title" });
+  assert.equal(
+    (ui.screen.getByRole("button", { name: "Save" }) as HTMLButtonElement)
+      .disabled,
+    true,
+  );
+  ui.fireEvent.change(input, { target: { value: task.title + " " } });
+  assert.equal(
+    (ui.screen.getByRole("button", { name: "Save" }) as HTMLButtonElement)
+      .disabled,
+    true,
+  );
+  ui.fireEvent.change(input, { target: { value: "First attempt" } });
+  await ui.act(async () => {
+    ui.fireEvent.keyDown(input, { key: "Enter", metaKey: true });
+  });
+  assert.ok(ui.screen.getByRole("button", { name: "Retry" }));
+  ui.fireEvent.change(input, { target: { value: "Corrected wording" } });
+  await ui.act(async () => {
+    ui.fireEvent.blur(input, { relatedTarget: document.body });
+  });
+  assert.equal(attempts, 2);
+  assert.equal(patches[1].title, "Corrected wording");
+});
