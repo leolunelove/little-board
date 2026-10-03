@@ -1,9 +1,12 @@
 export type Status = "pending" | "waiting" | "done";
+export type ChecklistItem = { id: string; title: string; done: boolean };
 export type Task = {
   id: string;
   board_id: string;
   title: string;
   note: string;
+  checklist?: ChecklistItem[];
+  original_request?: string;
   status: Status;
   assigned_to: "me" | "partner" | null;
   sort_order: number;

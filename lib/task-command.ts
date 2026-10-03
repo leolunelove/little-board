@@ -4,22 +4,36 @@ export function taskCommand(input: unknown) {
     throw new HttpError(400, "Invalid change.");
   const body = input as Record<string, unknown>;
   let command: Record<string, unknown>;
-  if (body.action === "add") {
-    if (!body.task || typeof body.task !== "object" || Array.isArray(body.task))
-      throw new HttpError(400, "Invalid item.");
-    const value = body.task as Record<string, unknown>;
-    command = {
-      action: "add",
-      task: {
+  if (body.action === "add" || body.action === "add_many") {
+    const values = body.action === "add" ? [body.task] : body.tasks;
+    if (!Array.isArray(values) || !values.length || values.length > 20)
+      throw new HttpError(400, "Add between 1 and 20 items at a time.");
+    const tasks = values.map((input: unknown) => {
+      if (!input || typeof input !== "object" || Array.isArray(input))
+        throw new HttpError(400, "Invalid item.");
+      const value = input as Record<string, unknown>;
+      return {
         ...taskPatch({
-          title: value?.title,
-          note: value?.note || "",
-          status: value?.status || "pending",
-          assigned_to: value?.assigned_to ?? null,
+          title: value.title,
+          note: value.note || "",
+          status: value.status || "pending",
+          assigned_to: value.assigned_to ?? null,
+          ...(value.checklist !== undefined
+            ? { checklist: value.checklist }
+            : {}),
+          ...(value.original_request !== undefined
+            ? { original_request: value.original_request }
+            : {}),
         }),
-        id: uuid(value?.id),
-      },
-    };
+        id: uuid(value.id),
+      };
+    });
+    if (new Set(tasks.map((task) => task.id)).size !== tasks.length)
+      throw new HttpError(400, "Duplicate item.");
+    command =
+      body.action === "add"
+        ? { action: "add", task: tasks[0] }
+        : { action: "add_many", tasks };
   } else if (body.action === "rename") {
     if (
       typeof body.title !== "string" ||

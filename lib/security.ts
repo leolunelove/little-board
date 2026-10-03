@@ -24,13 +24,45 @@ export function taskPatch(value: unknown) {
   const v = value as Record<string, unknown>,
     out: Record<string, unknown> = {};
   for (const key of Object.keys(v))
-    if (!["title", "note", "status", "assigned_to"].includes(key))
+    if (
+      ![
+        "title",
+        "note",
+        "status",
+        "assigned_to",
+        "checklist",
+        "original_request",
+      ].includes(key)
+    )
       throw new HttpError(400, "Unsupported field.");
   if ("title" in v) out.title = title(v.title);
   if ("note" in v) {
     if (typeof v.note !== "string" || v.note.length > 400)
       throw new HttpError(400, "Keep notes under 400 characters.");
     out.note = v.note.trim();
+  }
+  if ("checklist" in v) {
+    if (!Array.isArray(v.checklist) || v.checklist.length > 20)
+      throw new HttpError(400, "Use up to 20 checklist steps.");
+    const steps = v.checklist.map((step: unknown) => {
+      if (!step || typeof step !== "object" || Array.isArray(step))
+        throw new HttpError(400, "Invalid checklist step.");
+      const item = step as Record<string, unknown>;
+      if (typeof item.done !== "boolean")
+        throw new HttpError(400, "Invalid checklist step.");
+      return { id: uuid(item.id), title: title(item.title), done: item.done };
+    });
+    if (new Set(steps.map((step) => step.id)).size !== steps.length)
+      throw new HttpError(400, "Duplicate checklist step.");
+    out.checklist = steps;
+  }
+  if ("original_request" in v) {
+    if (
+      typeof v.original_request !== "string" ||
+      v.original_request.length > 4000
+    )
+      throw new HttpError(400, "Keep pasted requests under 4,000 characters.");
+    out.original_request = v.original_request.trim();
   }
   if ("status" in v) {
     if (!["pending", "waiting", "done"].includes(String(v.status)))

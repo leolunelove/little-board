@@ -20,24 +20,29 @@ export function applyCommand(
     title?: string;
     id?: string;
     task?: Task;
+    tasks?: Task[];
     patch?: Partial<Task>;
     items?: Pick<Task, "id" | "status" | "sort_order">[];
   };
   const next = structuredClone(board);
   if (command.action === "rename") next.title = command.title!;
-  if (command.action === "add") {
-    if (next.tasks.some((t) => t.id === command.task!.id)) return next;
-    if (next.tasks.length >= 1000)
+  if (command.action === "add" || command.action === "add_many") {
+    const additions = (
+      command.action === "add" ? [command.task!] : command.tasks!
+    ).filter((item) => !next.tasks.some((task) => task.id === item.id));
+    if (next.tasks.length + additions.length > 1000)
       throw new HttpError(400, "This board has reached 1,000 items.");
-    const task = command.task!;
-    next.tasks.push({
-      ...task,
-      board_id: board.id,
-      sort_order: Math.max(0, ...next.tasks.map((t) => t.sort_order)) + 1024,
-      created_at: now,
-      updated_at: now,
-      completed_at: task.status === "done" ? now : null,
-    });
+    if (!additions.length) return next;
+    for (const task of additions) {
+      next.tasks.push({
+        ...task,
+        board_id: board.id,
+        sort_order: Math.max(0, ...next.tasks.map((t) => t.sort_order)) + 1024,
+        created_at: now,
+        updated_at: now,
+        completed_at: task.status === "done" ? now : null,
+      });
+    }
   }
   if (command.action === "delete")
     next.tasks = next.tasks.filter((t) => t.id !== command.id);
