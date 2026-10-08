@@ -1251,3 +1251,85 @@ test("a failed save offers one explicit retry and clears the failure after succe
   assert.equal(result.current.error, "");
   assert.equal(result.current.board.tasks[0].status, "waiting");
 });
+
+test("moving restores every affected position and status on Undo", async () => {
+  const second = { ...task, id: crypto.randomUUID(), sort_order: 2048 };
+  const board = { ...initial, tasks: [task, second] };
+  const { result } = ui.renderHook(() => useMemoMutations(board, true));
+  const items = [
+    { id: second.id, status: "waiting" as const, sort_order: 0 },
+    { id: task.id, status: "waiting" as const, sort_order: 1024 },
+  ];
+  await ui.act(async () => {
+    await result.current.complete(
+      task,
+      "reorder",
+      { items },
+      (current) => ({
+        ...current,
+        tasks: current.tasks.map((row) => ({
+          ...row,
+          ...items.find((item) => item.id === row.id),
+        })),
+      }),
+      false,
+      "move",
+    );
+  });
+  assert.equal(result.current.undo?.kind, "move");
+  assert.equal(result.current.board.tasks[0].status, "waiting");
+  await ui.act(async () => {
+    await result.current.undoLast();
+  });
+  assert.deepEqual(result.current.board.tasks, board.tasks);
+  assert.equal(result.current.undo, null);
+});
+
+test("quick-add Enter submits once and keeps the composer ready for another item", async () => {
+  const saves: string[] = [];
+  ui.render(
+    createElement(TaskEditor, {
+      onCancel() {},
+      async onSave(patch) {
+        saves.push(patch.title!);
+        return true;
+      },
+    }),
+  );
+  const input = ui.screen.getByRole("textbox", {
+    name: "Item title",
+  }) as HTMLInputElement;
+  ui.fireEvent.change(input, { target: { value: "First item" } });
+  ui.fireEvent.keyDown(input, { key: "Enter" });
+  await ui.waitFor(() => assert.deepEqual(saves, ["First item"]));
+  await ui.waitFor(() => assert.equal(input.value, ""));
+  assert.equal(document.activeElement, input);
+  ui.fireEvent.change(input, { target: { value: "Second item" } });
+  ui.fireEvent.keyDown(input, { key: "Enter" });
+  await ui.waitFor(() =>
+    assert.deepEqual(saves, ["First item", "Second item"]),
+  );
+});
+
+test("checklist notes are tucked inside the expandable card for viewers", async () => {
+  const board = {
+    ...initial,
+    tasks: [
+      {
+        ...task,
+        checklist: [
+          { id: crypto.randomUUID(), title: "Review cut", done: false },
+        ],
+      },
+    ],
+  };
+  const rendered = ui.render(
+    createElement(MemoBoard, { initial: board, mode: "viewer", demo: true }),
+  );
+  const details = rendered.container.querySelector("details.task-checklist")!;
+  assert.equal(details.hasAttribute("open"), false);
+  assert.ok(
+    details.querySelector(".task-note")?.textContent?.includes(task.note),
+  );
+  assert.equal(rendered.container.querySelector(".task-note-line"), null);
+});
