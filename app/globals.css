@@ -1944,3 +1944,155 @@ label.checklist-step {
     transition: none;
   }
 }
+
+.paste-button.icon-button {
+  width: auto;
+  flex-basis: auto;
+  padding: 0 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.paste-label {
+  font-size: 13px;
+  white-space: nowrap;
+}
+.paste-hint {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--muted);
+  display: none;
+  gap: 5px;
+  align-items: center;
+  margin: 5px 8px 0;
+}
+.paste-hint .icon-button {
+  flex: 0 0 28px;
+  height: 28px;
+}
+.board-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--field);
+  border-radius: 12px;
+  padding: 6px 12px;
+  margin: 18px 0 8px;
+  color: var(--muted);
+}
+.board-search input {
+  flex: 1;
+  min-width: 0;
+  height: 40px;
+  border: 0;
+  background: none;
+  font-size: 16px;
+  color: var(--ink);
+}
+.draft-recovery {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 14px 0;
+}
+.import-select {
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+  margin: 14px 0 0;
+  accent-color: var(--accent);
+}
+.import-row-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  flex: 0 0 34px;
+}
+.import-row-actions .text-button {
+  font-size: 11px;
+  min-height: 28px;
+  padding: 0;
+}
+.import-refine {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.import-refine .caption {
+  font-size: 11px;
+}
+.split-editor {
+  background: var(--field);
+  border-radius: 12px;
+  padding: 12px;
+}
+.split-editor label {
+  color: var(--muted);
+  font-size: 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.split-editor textarea {
+  background: var(--surface);
+}
+.move-label {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  padding: 6px 8px 0;
+}
+.embedded-memo {
+  width: 100%;
+  margin: 0;
+  padding: 18px 0 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+}
+.embedded-memo .memo-header h1 {
+  font-size: 27px;
+}
+.embedded-memo .task-section {
+  margin-top: 24px;
+}
+.embedded-memo .header-controls {
+  gap: 2px;
+}
+.viewer-preview-panel > .text-button {
+  margin-top: 12px;
+}
+.viewer-preview-button {
+  margin: 6px 0 10px;
+}
+.share-secondary .copy-viewer-link {
+  justify-content: center;
+  flex: 1;
+}
+@media (max-width: 600px) {
+  .paste-label {
+    display: none;
+  }
+  .paste-button.icon-button {
+    width: 52px;
+    flex: 0 0 52px;
+    justify-content: center;
+    padding: 0;
+  }
+  .paste-hint {
+    display: flex;
+  }
+  .import-bottom {
+    justify-content: flex-start;
+  }
+}
+.board-search input::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+}
+.search-summary {
+  color: var(--muted);
+  font-size: 12px;
+  margin: 18px 0 4px;
+}
