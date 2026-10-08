@@ -2096,3 +2096,40 @@ label.checklist-step {
   font-size: 12px;
   margin: 18px 0 4px;
 }
+
+/* Stable save feedback and comfortable moving without adding visual weight. */
+.updated {
+  min-height: 20px;
+  font-variant-numeric: tabular-nums;
+}
+.updated.is-saving {
+  color: var(--accent);
+}
+.updated.is-unsaved {
+  color: var(--waiting);
+}
+.add-key-hint {
+  font-size: 11px;
+  color: var(--muted);
+}
+.task-checklist > .task-note {
+  margin: 10px 0 8px;
+  white-space: pre-wrap;
+}
+@media (pointer: coarse) {
+  .row-tools {
+    opacity: 1;
+    margin-right: 0;
+  }
+  .row-tools .icon-button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .row-menu button,
+  .row-menu select {
+    min-height: 44px;
+  }
+  .add-key-hint {
+    display: none;
+  }
+}
