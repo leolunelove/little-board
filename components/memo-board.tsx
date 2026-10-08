@@ -43,11 +43,13 @@ import {
   Eye,
   EyeOff,
   ClipboardPaste,
+  Search,
 } from "lucide-react";
 import type { Board, Task, Status, Mode } from "@/lib/types";
 import { isArchived } from "@/lib/archive";
 import { RedactedText } from "@/components/redacted-text";
 import { TaskEditor } from "@/components/task-editor";
+import { useSessionDraft } from "@/components/use-session-draft";
 import { PasteRequest, type ImportedItem } from "@/components/paste-request";
 import { TaskChecklist } from "@/components/task-checklist";
 import { TaskNote } from "@/components/task-note";
@@ -81,7 +83,9 @@ export function MemoBoard({
   mode,
   demo = false,
   personalActions,
+  embedded = false,
 }: {
+  embedded?: boolean;
   initial: Board;
   mode: Mode;
   demo?: boolean;
@@ -93,6 +97,8 @@ export function MemoBoard({
     busy,
     error,
     setError,
+    canRetry,
+    retryLast,
     inFlight,
     revision,
     change,
@@ -103,8 +109,29 @@ export function MemoBoard({
     undoLast,
     settleUndo,
   } = useMemoMutations(initial, demo);
+  const writable = mode !== "viewer";
+  const [query, setQuery] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [newChecklists, setNewChecklists] = useState<string[]>([]);
+  const [pasteHint, setPasteHint] = useState(() => {
+    try {
+      return writable && localStorage.getItem("memo:paste-hint") !== "seen";
+    } catch {
+      return writable;
+    }
+  });
+  const [addDraft, setAddDraft] = useSessionDraft<Partial<Task> | null>(
+    `memo:draft:v1:${initial.id}:add`,
+    null,
+    writable && !demo,
+  );
+  const rememberAdd = useCallback(
+    (id: string, patch: Partial<Task> | null) =>
+      setAddDraft(patch ? { ...patch, id } : null),
+    [setAddDraft],
+  );
   const [editing, setEditing] = useState<string | null>(null),
-    [adding, setAdding] = useState(false),
+    [adding, setAdding] = useState(Boolean(addDraft)),
     [pasting, setPasting] = useState(false),
     [notice, setNotice] = useState(""),
     [share, setShare] = useState(false),
@@ -116,7 +143,11 @@ export function MemoBoard({
   const [showArchive, setShowArchive] = useState(false),
     [now, setNow] = useState(Date.now());
   const [addDirty, setAddDirty] = useState(false);
-  const [drafts, setDrafts] = useState<Record<string, Partial<Task>>>({});
+  const [drafts, setDrafts] = useSessionDraft<Record<string, Partial<Task>>>(
+    `memo:draft:v1:${initial.id}:edits`,
+    {},
+    writable && !demo,
+  );
   const rememberDraft = useCallback(
     (id: string, draft: Partial<Task> | null) => {
       setDrafts((current) => {
@@ -127,7 +158,7 @@ export function MemoBoard({
         return next;
       });
     },
-    [],
+    [setDrafts],
   );
   const [activeId, setActiveId] = useState<string | null>(null);
   const [destination, setDestination] = useState<DropTarget | null>(null);
@@ -173,7 +204,6 @@ export function MemoBoard({
     const timer = setInterval(() => setNow(Date.now()), 15000);
     return () => clearInterval(timer);
   }, []);
-  const writable = mode !== "viewer";
   const dockVisible = writable && !showArchive && !editing;
   const { dockRef, style: dockStyle } = useComposerDock(dockVisible, adding);
   const addButtonRef = useRef<HTMLButtonElement>(null);
@@ -283,6 +313,8 @@ export function MemoBoard({
         : await change("update", payload, transform, fromEditor);
     if (ok) {
       setFresh(true);
+      if (patch.status && patch.status !== task.status)
+        setNotice(`Moved to ${labels[patch.status]}`);
       if (fromEditor) {
         rememberDraft(task.id, null);
         setEditing((current) => (current === task.id ? null : current));
@@ -348,7 +380,7 @@ export function MemoBoard({
   function onDragEnd(event: DragEndEvent) {
     const next = dropDestination(event);
     cancelDrag();
-    if (!next || busy || editing || addDirty) return;
+    if (!next || busy || editing || addDirty || query) return;
     const id = String(event.active.id);
     const task = board.tasks.find((item) => item.id === id);
     const changes = planMove(board.tasks, id, next, now, hiddenTaskId);
@@ -414,17 +446,47 @@ export function MemoBoard({
     (t) => t.id !== hiddenTaskId && isArchived(t, now),
   );
   const draggedTask = board.tasks.find((task) => task.id === activeId);
+  const searchCount = board.tasks.filter(
+    (task) =>
+      task.id !== hiddenTaskId &&
+      isArchived(task, now) === showArchive &&
+      [
+        task.title,
+        task.note,
+        ...(task.checklist || []).map((step) => step.title),
+      ]
+        .join(" ")
+        .toLocaleLowerCase()
+        .includes(query.trim().toLocaleLowerCase()),
+  ).length;
   const content = (
     <>
+      {query.trim() && (
+        <p className="search-summary" role="status">
+          {searchCount
+            ? `${searchCount} matching ${searchCount === 1 ? "item" : "items"}`
+            : "No items found. Try another word."}
+        </p>
+      )}
       {(showArchive ? (["done"] as Status[]) : statuses).map((status) => {
         const tasks = board.tasks
           .filter(
             (t) =>
               t.id !== hiddenTaskId &&
               t.status === status &&
-              isArchived(t, now) === showArchive,
+              isArchived(t, now) === showArchive &&
+              (!query.trim() ||
+                [
+                  t.title,
+                  t.note,
+                  ...(t.checklist || []).map((step) => step.title),
+                ]
+                  .join(" ")
+                  .toLocaleLowerCase()
+                  .includes(query.trim().toLocaleLowerCase())),
           )
           .sort((a, b) => a.sort_order - b.sort_order);
+        if (query.trim() && !tasks.length) return null;
         return (
           <Section
             key={status}
@@ -432,7 +494,12 @@ export function MemoBoard({
             status={status}
             count={tasks.length}
             writable={
-              writable && !showArchive && !busy && !editing && !addDirty
+              writable &&
+              !showArchive &&
+              !busy &&
+              !editing &&
+              !addDirty &&
+              !query
             }
             dropAtEnd={Boolean(
               activeId &&
@@ -442,7 +509,11 @@ export function MemoBoard({
             dragging={Boolean(activeId)}
             collapseDisabled={busy || Boolean(editing) || Boolean(activeId)}
             collapsed={
-              !showArchive && status === "done" && collapsed && !activeId
+              !showArchive &&
+              status === "done" &&
+              collapsed &&
+              !activeId &&
+              !query
             }
             toggle={toggleDone}
           >
@@ -454,13 +525,20 @@ export function MemoBoard({
                 <TaskRow
                   key={task.id}
                   task={task}
+                  initiallyOpen={
+                    newChecklists.includes(task.id) || Boolean(query)
+                  }
                   personal={Boolean(initial.code)}
                   draft={drafts[task.id]}
                   onDraftChange={rememberDraft}
                   writable={writable}
                   busy={busy}
                   dragDisabled={
-                    busy || Boolean(editing) || addDirty || showArchive
+                    busy ||
+                    Boolean(editing) ||
+                    addDirty ||
+                    showArchive ||
+                    Boolean(query)
                   }
                   dragActive={Boolean(activeId)}
                   reducedMotion={reducedMotion}
@@ -492,19 +570,21 @@ export function MemoBoard({
             </SortableContext>
             {tasks.length === 0 && (
               <p className="section-empty">
-                {status === "pending"
-                  ? activeId
-                    ? "Drop here"
-                    : "Nothing pending. A little breathing room."
-                  : status === "waiting"
+                {query
+                  ? "No matching items here."
+                  : status === "pending"
                     ? activeId
                       ? "Drop here"
-                      : "Nothing waiting."
-                    : showArchive
-                      ? "No archived items yet."
-                      : activeId
+                      : "Nothing pending. A little breathing room."
+                    : status === "waiting"
+                      ? activeId
                         ? "Drop here"
-                        : "Completed items stay here for 24 hours, then move to Archived."}
+                        : "Nothing waiting."
+                      : showArchive
+                        ? "No archived items yet."
+                        : activeId
+                          ? "Drop here"
+                          : "Completed items stay here for 24 hours, then move to Archived."}
               </p>
             )}
           </Section>
@@ -514,10 +594,10 @@ export function MemoBoard({
   );
   return (
     <main
-      className={`memo-shell${writable ? "" : " viewer-memo"}${redacted ? " redacted" : ""}${dockVisible ? " has-quick-add" : ""}`}
+      className={`memo-shell${embedded ? " embedded-memo" : ""}${writable ? "" : " viewer-memo"}${redacted ? " redacted" : ""}${dockVisible ? " has-quick-add" : ""}`}
       style={dockStyle}
     >
-      {initial.code && (
+      {initial.code && !embedded && (
         <nav className="personal-topbar" aria-label="Board controls">
           <button
             className="text-button"
@@ -688,6 +768,17 @@ export function MemoBoard({
           </div>
           <div className="header-controls">
             <button
+              className="icon-button"
+              aria-label="Search board"
+              aria-expanded={searchOpen}
+              onClick={() => {
+                setSearchOpen(!searchOpen);
+                if (searchOpen) setQuery("");
+              }}
+            >
+              <Search size={17} />
+            </button>
+            <button
               className="redaction-toggle"
               aria-label="Redaction effect"
               aria-pressed={redacted}
@@ -704,6 +795,40 @@ export function MemoBoard({
           </div>
         </div>
       </header>
+      {searchOpen && (
+        <div className="board-search">
+          <Search size={16} />
+          <input
+            type="search"
+            autoFocus
+            aria-label="Find items"
+            placeholder="Find an item or step…"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Escape") {
+                setQuery("");
+                setSearchOpen(false);
+              }
+            }}
+          />
+          <button
+            className="icon-button"
+            aria-label="Clear search"
+            onClick={() => setQuery("")}
+          >
+            <X size={15} />
+          </button>
+        </div>
+      )}
+      {writable &&
+        Object.keys(drafts).some((id) =>
+          board.tasks.some((task) => task.id === id),
+        ) && (
+          <p className="draft-recovery" role="status">
+            You have an unsaved edit. Tap its item to continue.
+          </p>
+        )}
       {share && writable && !demo && (
         <div className="share-panel">
           <div className="share-heading">
@@ -767,6 +892,22 @@ export function MemoBoard({
       {error && (
         <div className="error-banner" role="alert">
           {error}
+          {canRetry && !editing && !adding && !pasting && (
+            <button
+              className="text-button"
+              disabled={busy}
+              onClick={() =>
+                void retryLast().then((ok) => {
+                  if (ok) {
+                    setFresh(true);
+                    setNotice("Saved");
+                  }
+                })
+              }
+            >
+              Retry save
+            </button>
+          )}
           <button aria-label="Dismiss error" onClick={() => setError("")}>
             <X size={16} />
           </button>
@@ -843,10 +984,14 @@ export function MemoBoard({
             <TaskEditor
               personal={Boolean(initial.code)}
               busy={busy}
+              draft={addDraft || undefined}
+              draftId={addDraft?.id}
+              onDraftChange={rememberAdd}
               onDirtyChange={setAddDirty}
               onCancel={() => {
                 setAdding(false);
                 setAddDirty(false);
+                setAddDraft(null);
               }}
               onSave={async (patch, id) => {
                 setNotice("");
@@ -872,6 +1017,8 @@ export function MemoBoard({
                 }));
                 if (ok) {
                   setFresh(true);
+                  if (task.checklist?.length)
+                    setNewChecklists((current) => [...current, task.id]);
                   setNotice(`Added to ${labels[task.status]}`);
                 }
                 return ok;
@@ -898,17 +1045,40 @@ export function MemoBoard({
                 disabled={busy || Boolean(activeId)}
                 onClick={() => {
                   setError("");
+                  setPasteHint(false);
+                  try {
+                    localStorage.setItem("memo:paste-hint", "seen");
+                  } catch {}
                   setPasting(true);
                 }}
               >
                 <ClipboardPaste size={20} />
+                <span className="paste-label">Paste request</span>
               </button>
             </div>
+          )}
+          {pasteHint && !adding && (
+            <p className="paste-hint">
+              Client sent a list? Paste it to turn it into items.
+              <button
+                className="icon-button"
+                aria-label="Dismiss paste hint"
+                onClick={() => {
+                  setPasteHint(false);
+                  try {
+                    localStorage.setItem("memo:paste-hint", "seen");
+                  } catch {}
+                }}
+              >
+                <X size={13} />
+              </button>
+            </p>
           )}
         </div>
       )}
       {pasting && writable && (
         <PasteRequest
+          boardId={demo ? undefined : initial.id}
           onClose={() => setPasting(false)}
           onAdd={async (items: ImportedItem[]) => {
             const stamp = new Date().toISOString();
@@ -939,6 +1109,12 @@ export function MemoBoard({
             }));
             if (ok) {
               setFresh(true);
+              setNewChecklists((current) => [
+                ...current,
+                ...tasks
+                  .filter((task) => task.checklist?.length)
+                  .map((task) => task.id),
+              ]);
               setNotice(
                 `Added ${tasks.length === 1 ? (tasks[0].checklist?.length ? "a checklist" : "an item") : `${tasks.length} items`} to Pending`,
               );
@@ -963,7 +1139,7 @@ export function MemoBoard({
             : `Archived${archived.length ? " · " + archived.length : ""}`}
         </button>
       )}
-      <footer className="memo-footer">
+      <footer className="memo-footer" hidden={embedded}>
         <span className="footer-status">
           <Check size={12} />
           {demo
@@ -1072,6 +1248,7 @@ function Section({
   );
 }
 function TaskRow({
+  initiallyOpen = false,
   personal = false,
   task,
   draft,
@@ -1094,6 +1271,7 @@ function TaskRow({
   onMove,
 }: {
   task: Task;
+  initiallyOpen?: boolean;
   personal?: boolean;
   draft?: Partial<Task>;
   onDraftChange: (id: string, draft: Partial<Task> | null) => void;
@@ -1231,6 +1409,7 @@ function TaskRow({
             )}
             <TaskChecklist
               task={task}
+              initiallyOpen={initiallyOpen}
               writable={writable}
               busy={busy}
               onSave={onSave}
@@ -1290,11 +1469,12 @@ function TaskRow({
                     }
                   }}
                 >
+                  <label className="move-label">Move to…</label>
                   <select
                     aria-label={`Status for ${task.title}`}
                     value={task.status}
                     onChange={(e) => {
-                      onSave({ status: e.target.value as Status });
+                      void onSave({ status: e.target.value as Status });
                       setMenu(false);
                     }}
                   >

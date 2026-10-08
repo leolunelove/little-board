@@ -18,6 +18,12 @@ export function useMemoMutations(initial: Board, demo: boolean) {
   const [board, setBoardState] = useState(initial);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [failedChange, setFailedChange] = useState<{
+    action: string;
+    payload: Record<string, unknown>;
+    optimistic?: Transform;
+    defer: boolean;
+  } | null>(null);
   const [undo, setUndoState] = useState<Undo | null>(null);
   const boardRef = useRef(initial);
   const undoRef = useRef<Undo | null>(null);
@@ -54,6 +60,7 @@ export function useMemoMutations(initial: Board, demo: boolean) {
       if (mounted.current) {
         setBusy(true);
         setError("");
+        setFailedChange(null);
       }
       const execute = async () => {
         const before = boardRef.current;
@@ -132,6 +139,8 @@ export function useMemoMutations(initial: Board, demo: boolean) {
             }
           }
           setBoard(before);
+          if (mounted.current)
+            setFailedChange({ action, payload, optimistic, defer });
           if (mounted.current)
             setError(
               e instanceof TypeError
@@ -288,6 +297,16 @@ export function useMemoMutations(initial: Board, demo: boolean) {
     busy,
     error,
     setError,
+    canRetry: Boolean(failedChange),
+    retryLast: () =>
+      failedChange
+        ? change(
+            failedChange.action,
+            failedChange.payload,
+            failedChange.optimistic,
+            failedChange.defer,
+          )
+        : Promise.resolve(false),
     inFlight,
     revision,
     change,

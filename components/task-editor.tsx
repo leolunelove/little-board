@@ -10,12 +10,14 @@ export function TaskEditor({
   onCancel,
   onDirtyChange,
   draft,
+  draftId,
   personal = false,
   onDraftChange,
 }: {
   task?: Task;
   personal?: boolean;
   draft?: Partial<Task>;
+  draftId?: string;
   onDraftChange?: (id: string, draft: Partial<Task> | null) => void;
   busy?: boolean;
   onSave: (patch: Partial<Task>, id: string) => Promise<boolean>;
@@ -37,7 +39,7 @@ export function TaskEditor({
   const [details, setDetails] = useState(false);
   const [saving, setSaving] = useState(false);
   const [failed, setFailed] = useState(false);
-  const id = useRef(task?.id || crypto.randomUUID());
+  const id = useRef(task?.id || draftId || crypto.randomUUID());
   const submitting = useRef(false);
   const cancelled = useRef(false);
   const input = useRef<HTMLInputElement>(null);
@@ -46,22 +48,23 @@ export function TaskEditor({
   );
   const checklistChanged =
     JSON.stringify(checklist) !== JSON.stringify(task?.checklist || []);
-  const checklistValid = checklist.every(
-    (step) => step.title.trim() && step.title.trim().length <= 240,
-  );
+  const checklistValid = checklist
+    .filter((step) => step.title.trim())
+    .every((step) => step.title.trim() && step.title.trim().length <= 240);
   useEffect(() => {
     onDirtyChange?.(dirty);
   }, [dirty, onDirtyChange]);
   useEffect(() => {
-    if (!task || !onDraftChange) return;
-    const changed =
-      title !== task.title ||
-      note !== task.note ||
-      status !== task.status ||
-      assigned !== (task.assigned_to || "") ||
-      checklistChanged;
+    if (!onDraftChange) return;
+    const changed = !task
+      ? dirty
+      : title !== task.title ||
+        note !== task.note ||
+        status !== task.status ||
+        assigned !== (task.assigned_to || "") ||
+        checklistChanged;
     onDraftChange(
-      task.id,
+      id.current,
       changed
         ? {
             title,
@@ -80,6 +83,7 @@ export function TaskEditor({
     assigned,
     checklist,
     checklistChanged,
+    dirty,
     onDraftChange,
   ]);
   const changed =
@@ -92,6 +96,19 @@ export function TaskEditor({
   function cancel() {
     cancelled.current = true;
     onCancel();
+  }
+  function appendStep(afterId?: string) {
+    if (checklist.length >= 20) return;
+    const step = { id: crypto.randomUUID(), title: "", done: false };
+    setChecklist((current) => {
+      const index = afterId
+        ? current.findIndex((item) => item.id === afterId) + 1
+        : current.length;
+      return [...current.slice(0, index), step, ...current.slice(index)];
+    });
+    window.requestAnimationFrame(() =>
+      document.getElementById(`step-${step.id}`)?.focus(),
+    );
   }
   const locked = saving || busy;
   return (
@@ -127,10 +144,12 @@ export function TaskEditor({
           ok = await onSave(
             {
               title: title.trim(),
-              checklist: checklist.map((step) => ({
-                ...step,
-                title: step.title.trim(),
-              })),
+              checklist: checklist
+                .filter((step) => step.title.trim())
+                .map((step) => ({
+                  ...step,
+                  title: step.title.trim(),
+                })),
               ...(originalRequest !== undefined
                 ? { original_request: originalRequest }
                 : {}),
@@ -150,6 +169,7 @@ export function TaskEditor({
           input.current?.focus();
           return;
         }
+        onDraftChange?.(id.current, null);
         if (!task) {
           setTitle("");
           setNote("");
@@ -228,7 +248,21 @@ export function TaskEditor({
             {checklist.map((step, index) => (
               <div className="editor-step" key={step.id}>
                 <input
+                  id={`step-${step.id}`}
                   aria-label={`Checklist step ${index + 1}`}
+                  enterKeyHint="next"
+                  onKeyDown={(event) => {
+                    if (
+                      event.key === "Enter" &&
+                      !event.metaKey &&
+                      !event.ctrlKey &&
+                      !event.nativeEvent.isComposing
+                    ) {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      if (!locked && step.title.trim()) appendStep(step.id);
+                    }
+                  }}
                   placeholder="What needs to happen?"
                   value={step.title}
                   maxLength={240}
@@ -263,12 +297,7 @@ export function TaskEditor({
               type="button"
               className="text-button"
               disabled={locked || checklist.length >= 20}
-              onClick={() =>
-                setChecklist((current) => [
-                  ...current,
-                  { id: crypto.randomUUID(), title: "", done: false },
-                ])
-              }
+              onClick={() => appendStep()}
             >
               <Plus size={14} />
               {checklist.length ? "Add step" : "Add a checklist"}

@@ -2,6 +2,7 @@
 import { useRef, useState } from "react";
 import { ArrowLeft, Plus, X } from "lucide-react";
 import { Sheet } from "./sheet";
+import { useSessionDraft } from "./use-session-draft";
 import { splitRequest } from "@/lib/paste-request";
 import type { Task } from "@/lib/types";
 
@@ -12,21 +13,65 @@ export type ImportedItem = Pick<
 export function PasteRequest({
   onClose,
   onAdd,
+  boardId,
 }: {
+  boardId?: string;
   onClose: () => void;
   onAdd: (items: ImportedItem[]) => Promise<boolean>;
 }) {
-  const [text, setText] = useState("");
-  const [items, setItems] = useState<{ id: string; title: string }[] | null>(
-    null,
+  type Draft = {
+    text: string;
+    items: { id: string; title: string }[] | null;
+    grouped: boolean;
+    heading: string;
+    keepSource: boolean;
+    groupId: string;
+    splitting: string | null;
+    splitText: string;
+  };
+  const empty: Draft = {
+    text: "",
+    items: null,
+    grouped: false,
+    heading: "",
+    keepSource: true,
+    groupId: crypto.randomUUID(),
+    splitting: null,
+    splitText: "",
+  };
+  const [draft, setDraft] = useSessionDraft<Draft>(
+    `memo:draft:v1:${boardId}:paste`,
+    empty,
+    Boolean(boardId),
   );
-  const [grouped, setGrouped] = useState(false);
-  const [heading, setHeading] = useState("");
-  const [keepSource, setKeepSource] = useState(true);
+  const { text, items, grouped, heading, keepSource } = draft;
+  const setText = (text: string) =>
+    setDraft((current) => ({ ...current, text }));
+  const setHeading = (heading: string) =>
+    setDraft((current) => ({ ...current, heading }));
+  const setGrouped = (grouped: boolean) =>
+    setDraft((current) => ({ ...current, grouped }));
+  const setKeepSource = (keepSource: boolean) =>
+    setDraft((current) => ({ ...current, keepSource }));
+  const setItems = (
+    next: Draft["items"] | ((items: Draft["items"]) => Draft["items"]),
+  ) =>
+    setDraft((current) => ({
+      ...current,
+      items: typeof next === "function" ? next(current.items) : next,
+    }));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const groupId = useRef(crypto.randomUUID());
+  const [selected, setSelected] = useState<string[]>([]);
+  const splitting = draft.splitting || null;
+  const splitText = draft.splitText || "";
+  const setSplitting = (splitting: string | null) =>
+    setDraft((current) => ({ ...current, splitting }));
+  const setSplitText = (splitText: string) =>
+    setDraft((current) => ({ ...current, splitText }));
+  const groupId = useRef(draft.groupId);
   const valid = Boolean(
+    !splitting &&
     items?.length &&
     items.length <= 20 &&
     items.every(
@@ -72,8 +117,17 @@ export function PasteRequest({
             required
           />
           <span className="caption">
-            Lists and line breaks work best. No AI service is used.
+            Lists and line breaks work best. Review the wording before adding.
           </span>
+          {text && (
+            <button
+              type="button"
+              className="text-button"
+              onClick={() => setDraft(empty)}
+            >
+              Discard pasted draft
+            </button>
+          )}
           <button
             className="primary-action"
             type="submit"
@@ -110,8 +164,10 @@ export function PasteRequest({
                   ...source,
                 }));
             try {
-              if (await onAdd(drafts)) onClose();
-              else
+              if (await onAdd(drafts)) {
+                setDraft(empty);
+                onClose();
+              } else
                 setError(
                   "Couldn’t add these yet. Your changes are still here—try again.",
                 );
@@ -165,12 +221,57 @@ export function PasteRequest({
               />
             </label>
           )}
+          <div className="import-refine">
+            <button
+              className="text-button"
+              type="button"
+              disabled={saving || selected.length < 2}
+              onClick={() => {
+                const chosen = items.filter((item) =>
+                  selected.includes(item.id),
+                );
+                const first = chosen[0];
+                if (!first) return;
+                setItems((current) =>
+                  current!.flatMap((item) =>
+                    item.id === first.id
+                      ? [
+                          {
+                            ...item,
+                            title: chosen
+                              .map((row) => row.title.trim())
+                              .join("; "),
+                          },
+                        ]
+                      : selected.includes(item.id)
+                        ? []
+                        : [item],
+                  ),
+                );
+                setSelected([]);
+              }}
+            >
+              Merge selected{selected.length ? ` (${selected.length})` : ""}
+            </button>
+            <span className="caption">Select two or more to combine.</span>
+          </div>
           <div className="import-items">
             {items.map((item, index) => (
               <div className="import-item" key={item.id}>
-                <span className="import-index" aria-hidden="true">
-                  {index + 1}
-                </span>
+                <input
+                  className="import-select"
+                  type="checkbox"
+                  aria-label={`Select suggested item ${index + 1}`}
+                  checked={selected.includes(item.id)}
+                  disabled={saving}
+                  onChange={() =>
+                    setSelected((current) =>
+                      current.includes(item.id)
+                        ? current.filter((id) => id !== item.id)
+                        : [...current, item.id],
+                    )
+                  }
+                />
                 <textarea
                   aria-label={`Suggested item ${index + 1}`}
                   value={item.title}
@@ -187,22 +288,86 @@ export function PasteRequest({
                   }
                   required
                 />
-                <button
-                  className="icon-button"
-                  type="button"
-                  aria-label={`Remove suggested item ${index + 1}`}
-                  disabled={saving}
-                  onClick={() =>
-                    setItems((current) =>
-                      current!.filter((row) => row.id !== item.id),
-                    )
-                  }
-                >
-                  <X size={16} />
-                </button>
+                <div className="import-row-actions">
+                  <button
+                    type="button"
+                    className="text-button"
+                    disabled={saving}
+                    aria-label={`Split suggested item ${index + 1}`}
+                    onClick={() => {
+                      setSplitting(item.id);
+                      setSplitText(item.title);
+                    }}
+                  >
+                    Split
+                  </button>
+                  <button
+                    className="icon-button"
+                    type="button"
+                    aria-label={`Remove suggested item ${index + 1}`}
+                    disabled={saving}
+                    onClick={() =>
+                      setItems((current) =>
+                        current!.filter((row) => row.id !== item.id),
+                      )
+                    }
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
               </div>
             ))}
           </div>
+          {splitting && (
+            <div className="split-editor">
+              <label>
+                One step per line
+                <textarea
+                  aria-label="Split into steps"
+                  value={splitText}
+                  rows={4}
+                  onChange={(event) => setSplitText(event.target.value)}
+                  maxLength={4000}
+                />
+              </label>
+              <div className="import-bottom">
+                <button
+                  type="button"
+                  className="text-button"
+                  onClick={() => setSplitting(null)}
+                >
+                  Cancel split
+                </button>
+                <button
+                  type="button"
+                  className="text-button"
+                  disabled={
+                    splitText.trim().split(/\n+/).filter(Boolean).length < 2
+                  }
+                  onClick={() => {
+                    const parts = splitText
+                      .split(/\n+/)
+                      .map((title) => title.trim())
+                      .filter(Boolean);
+                    setItems((current) =>
+                      current!.flatMap((item) =>
+                        item.id === splitting
+                          ? parts.map((title, index) => ({
+                              id: index ? crypto.randomUUID() : item.id,
+                              title,
+                            }))
+                          : [item],
+                      ),
+                    );
+                    setSplitting(null);
+                    setSelected([]);
+                  }}
+                >
+                  Use these steps
+                </button>
+              </div>
+            </div>
+          )}
           {items.length > 20 && (
             <p className="draft-error" role="alert">
               Use up to 20 items per paste. Remove or combine some before
@@ -250,11 +415,24 @@ export function PasteRequest({
               disabled={saving}
               onClick={() => {
                 setItems(null);
+                setSplitting(null);
+                setSelected([]);
                 setError("");
               }}
             >
               <ArrowLeft size={14} />
               Back to message
+            </button>
+            <button
+              type="button"
+              className="text-button"
+              disabled={saving}
+              onClick={() => {
+                setDraft(empty);
+                onClose();
+              }}
+            >
+              Discard
             </button>
             <button
               type="submit"

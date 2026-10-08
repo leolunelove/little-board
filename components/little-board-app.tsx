@@ -59,6 +59,7 @@ export function LittleBoardApp() {
     [partner, setPartner] = useState(""),
     [message, setMessage] = useState(""),
     [sheetError, setSheetError] = useState("");
+  const [viewerPreview, setViewerPreview] = useState<Board | null>(null);
   const requestId = useRef<string | null>(null),
     generation = useRef(0);
   const load = useCallback(async () => {
@@ -232,6 +233,7 @@ export function LittleBoardApp() {
               setSheet("claim");
             },
             onShare: () => {
+              setViewerPreview(null);
               setPartner(board.invited_email || "");
               setSheetError("");
               setMessage("");
@@ -242,15 +244,36 @@ export function LittleBoardApp() {
         {sheet && (
           <Sheet
             title={
-              sheet === "claim" || !board.claimed
-                ? "Keep it with you."
-                : "Share with one person."
+              viewerPreview
+                ? "Viewer preview"
+                : sheet === "claim" || !board.claimed
+                  ? "Keep it with you."
+                  : "Share with one person."
             }
             onClose={() => {
               if (!busy) setSheet(null);
             }}
           >
-            {!board.claimed ? (
+            {viewerPreview ? (
+              <div className="viewer-preview-panel">
+                <p className="form-hint">
+                  This is how the board looks to your viewer. They can read and
+                  expand items, but can’t change anything.
+                </p>
+                <MemoBoard
+                  initial={viewerPreview}
+                  mode="viewer"
+                  demo
+                  embedded
+                />
+                <button
+                  className="text-button"
+                  onClick={() => setViewerPreview(null)}
+                >
+                  ← Back to sharing
+                </button>
+              </div>
+            ) : !board.claimed ? (
               <>
                 <p className="sheet-copy">
                   Save this board to your email to open it on your other
@@ -295,6 +318,23 @@ export function LittleBoardApp() {
                     : "Add their email, then copy and send them the link. They’ll sign in with that email."}{" "}
                   An invitation email isn’t sent automatically.
                 </p>
+                <button
+                  className="text-button viewer-preview-button"
+                  disabled={busy}
+                  onClick={async () => {
+                    setBusy(true);
+                    setSheetError("");
+                    try {
+                      setViewerPreview(await memoRequest(`/api/memos/${code}`));
+                    } catch (error) {
+                      setSheetError((error as Error).message);
+                    } finally {
+                      setBusy(false);
+                    }
+                  }}
+                >
+                  Preview their view
+                </button>
                 <form
                   className="little-email"
                   onSubmit={async (e) => {
@@ -347,7 +387,8 @@ export function LittleBoardApp() {
                 {board.invited_email && (
                   <div className="share-secondary">
                     <button
-                      className="text-button"
+                      className="little-primary copy-viewer-link"
+                      disabled={busy}
                       onClick={async () => {
                         try {
                           await navigator.clipboard.writeText(
@@ -364,7 +405,7 @@ export function LittleBoardApp() {
                       }}
                     >
                       <Link2 size={16} />
-                      Copy link
+                      Copy viewer link
                     </button>
                     <button
                       className="text-button danger-text"
@@ -634,6 +675,11 @@ export function LittleBoardApp() {
               setBusy(true);
               try {
                 await memoRequest("/api/email", { action: "logout" });
+                try {
+                  for (const key of Object.keys(sessionStorage))
+                    if (key.startsWith("memo:draft:v1:"))
+                      sessionStorage.removeItem(key);
+                } catch {}
                 await load();
               } catch (e) {
                 setError((e as Error).message);

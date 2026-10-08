@@ -1,4 +1,5 @@
 "use client";
+import { useEffect, useState } from "react";
 import { Check, ChevronDown } from "lucide-react";
 import type { Task } from "@/lib/types";
 import { RedactedText } from "./redacted-text";
@@ -7,18 +8,28 @@ export function TaskChecklist({
   writable,
   busy,
   onSave,
+  initiallyOpen = false,
 }: {
+  initiallyOpen?: boolean;
   task: Task;
   writable: boolean;
   busy: boolean;
   onSave: (patch: Partial<Task>) => Promise<boolean>;
 }) {
+  const [open, setOpen] = useState(initiallyOpen);
+  useEffect(() => {
+    if (initiallyOpen) setOpen(true);
+  }, [initiallyOpen]);
   const steps = task.checklist || [];
   const completed = steps.filter((item) => item.done).length;
   return (
     <>
       {steps.length > 0 && (
-        <details className="task-checklist">
+        <details
+          className="task-checklist"
+          open={open}
+          onToggle={(event) => setOpen(event.currentTarget.open)}
+        >
           <summary>
             <ChevronDown size={13} />
             <span>
