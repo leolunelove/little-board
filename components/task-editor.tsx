@@ -211,8 +211,14 @@ export function TaskEditor({
           maxLength={240}
           autoComplete="off"
           autoCapitalize="sentences"
-          enterKeyHint={task ? "done" : "enter"}
+          enterKeyHint={task ? "done" : "next"}
           spellCheck
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && !event.nativeEvent.isComposing) {
+              event.preventDefault();
+              event.currentTarget.form?.requestSubmit();
+            }
+          }}
           required
           readOnly={locked}
         />
@@ -343,6 +349,9 @@ export function TaskEditor({
           <ChevronDown size={13} />
           {details ? "Less detail" : "Add details"}
         </button>
+        {!task && (
+          <span className="add-key-hint">Enter to add · Esc to finish</span>
+        )}
         <span className="editor-spacer" />
         <button
           type="button"

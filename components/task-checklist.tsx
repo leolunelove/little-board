@@ -39,6 +39,11 @@ export function TaskChecklist({
               <span style={{ width: `${(completed / steps.length) * 100}%` }} />
             </span>
           </summary>
+          {task.note && (
+            <p className="task-note">
+              <RedactedText>{task.note}</RedactedText>
+            </p>
+          )}
           <ul>
             {steps.map((step) => (
               <li key={step.id} className={step.done ? "step-done" : ""}>

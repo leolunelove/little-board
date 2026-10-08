@@ -5,7 +5,8 @@ import type { Board, Task } from "@/lib/types";
 
 export const UNDO_MS = 8000;
 type Undo = {
-  kind: "delete" | "complete";
+  kind: "delete" | "complete" | "move";
+  previousOrder?: { id: string; status: Task["status"]; sort_order: number }[];
   task: Task;
   expiresAt: number;
   committing?: Promise<boolean>;
@@ -186,8 +187,13 @@ export function useMemoMutations(initial: Board, demo: boolean) {
   }, [clearUndo, commitDeletion]);
 
   const armUndo = useCallback(
-    (kind: Undo["kind"], task: Task) => {
-      const entry: Undo = { kind, task, expiresAt: Date.now() + UNDO_MS };
+    (kind: Undo["kind"], task: Task, previousOrder?: Undo["previousOrder"]) => {
+      const entry: Undo = {
+        kind,
+        task,
+        previousOrder,
+        expiresAt: Date.now() + UNDO_MS,
+      };
       undoRef.current = entry;
       if (mounted.current) setUndoState(entry);
       timer.current = setTimeout(() => {
@@ -218,11 +224,18 @@ export function useMemoMutations(initial: Board, demo: boolean) {
       payload: Record<string, unknown>,
       optimistic?: Transform,
       defer = false,
+      kind: "complete" | "move" = "complete",
     ) => {
       const result = undoQueue.current.then(async () => {
         if (!(await settleUndo())) return false;
+        const items = payload.items as { id: string }[] | undefined;
+        const previousOrder = items
+          ? boardRef.current.tasks
+              .filter((item) => items.some((move) => move.id === item.id))
+              .map(({ id, status, sort_order }) => ({ id, status, sort_order }))
+          : undefined;
         const ok = await change(action, payload, optimistic, defer);
-        if (ok) armUndo("complete", task);
+        if (ok) armUndo(kind, task, previousOrder);
         return ok;
       });
       undoQueue.current = result;
@@ -245,14 +258,29 @@ export function useMemoMutations(initial: Board, demo: boolean) {
       return;
     }
     const ok = await change(
-      "update",
-      { id: entry.task.id, patch: { status: entry.task.status } },
+      entry.previousOrder ? "reorder" : "update",
+      entry.previousOrder
+        ? { items: entry.previousOrder }
+        : { id: entry.task.id, patch: { status: entry.task.status } },
       (current) => ({
         ...current,
         tasks: current.tasks.map((task) =>
-          task.id === entry.task.id
-            ? { ...task, status: entry.task.status, completed_at: null }
-            : task,
+          entry.previousOrder?.find((item) => item.id === task.id)
+            ? {
+                ...task,
+                ...entry.previousOrder.find((item) => item.id === task.id)!,
+                completed_at:
+                  task.id === entry.task.id
+                    ? entry.task.completed_at
+                    : task.completed_at,
+              }
+            : task.id === entry.task.id
+              ? {
+                  ...task,
+                  status: entry.task.status,
+                  completed_at: entry.task.completed_at,
+                }
+              : task,
         ),
       }),
     );

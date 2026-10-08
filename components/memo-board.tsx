@@ -308,8 +308,15 @@ export function MemoBoard({
     });
     const payload = { id: task.id, patch };
     const ok =
-      patch.status === "done" && task.status !== "done"
-        ? await complete(task, "update", payload, transform, fromEditor)
+      patch.status && patch.status !== task.status
+        ? await complete(
+            task,
+            "update",
+            payload,
+            transform,
+            fromEditor,
+            patch.status === "done" ? "complete" : "move",
+          )
         : await change("update", payload, transform, fromEditor);
     if (ok) {
       setFresh(true);
@@ -387,10 +394,14 @@ export function MemoBoard({
     if (!task || !changes) return;
     const transform = (current: Board) =>
       applyOrder(current, changes, new Date().toISOString());
-    const saving =
-      next.status === "done" && task.status !== "done"
-        ? complete(task, "reorder", { items: changes }, transform)
-        : change("reorder", { items: changes }, transform);
+    const saving = complete(
+      task,
+      "reorder",
+      { items: changes },
+      transform,
+      false,
+      next.status === "done" && task.status !== "done" ? "complete" : "move",
+    );
     void saving.then((ok) => {
       if (ok) {
         setFresh(true);
@@ -416,13 +427,20 @@ export function MemoBoard({
       status: t.status,
       sort_order: i * 1024,
     }));
-    void change("reorder", { items: changes }, (current) => ({
-      ...current,
-      tasks: current.tasks.map((t) => ({
-        ...t,
-        ...changes.find((c) => c.id === t.id),
-      })),
-    }));
+    void complete(
+      task,
+      "reorder",
+      { items: changes },
+      (current) => ({
+        ...current,
+        tasks: current.tasks.map((t) => ({
+          ...t,
+          ...changes.find((c) => c.id === t.id),
+        })),
+      }),
+      false,
+      "move",
+    );
   }
   async function showViewerLink() {
     setShareBusy(true);
@@ -740,7 +758,11 @@ export function MemoBoard({
           )}
         </h1>
         <div className="header-meta">
-          <div className="updated" aria-live="polite" suppressHydrationWarning>
+          <div
+            className={`updated${busy ? " is-saving" : ""}${error && writable ? " is-unsaved" : ""}`}
+            role="status"
+            suppressHydrationWarning
+          >
             {busy ? (
               "Saving…"
             ) : error && writable ? (
@@ -916,6 +938,11 @@ export function MemoBoard({
       {writable ? (
         <DndContext
           sensors={sensors}
+          autoScroll={{
+            acceleration: 6,
+            interval: 16,
+            threshold: { x: 0, y: 0.15 },
+          }}
           collisionDetection={(args) => {
             pointerY.current = args.pointerCoordinates?.y ?? null;
             return memoCollision(args);
@@ -1171,7 +1198,9 @@ export function MemoBoard({
               ? "Removing…"
               : undo.kind === "delete"
                 ? "Item removed"
-                : "Item completed"}
+                : undo.kind === "move"
+                  ? "Item moved"
+                  : "Item completed"}
           </span>
           <button
             disabled={busy || Boolean(undo.committing)}
@@ -1400,7 +1429,7 @@ function TaskRow({
             {draft && writable && (
               <span className="unsaved-label">Unsaved edit</span>
             )}
-            {task.note && (
+            {task.note && !task.checklist?.length && (
               <TaskNote
                 task={task}
                 expanded={expanded}
