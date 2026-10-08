@@ -22,11 +22,18 @@ before(async () => {
     "MutationObserver",
     "getComputedStyle",
     "localStorage",
+    "sessionStorage",
   ] as const)
     Object.defineProperty(globalThis, key, {
       configurable: true,
       value: dom.window[key],
     });
+  dom.window.HTMLDialogElement.prototype.showModal = function () {
+    this.setAttribute("open", "");
+  };
+  dom.window.HTMLDialogElement.prototype.close = function () {
+    this.removeAttribute("open");
+  };
   dom.window.scrollTo = () => {};
   Object.assign(globalThis, {
     IS_REACT_ACT_ENVIRONMENT: true,
@@ -39,6 +46,7 @@ before(async () => {
 afterEach(() => {
   ui.cleanup();
   localStorage.clear();
+  sessionStorage.clear();
   window.history.replaceState(null, "", "/");
   transport.request = actual;
 });
@@ -177,4 +185,89 @@ test("leaving a guest board flushes a pending deletion synchronously", async () 
     0,
   );
   assert.equal((await pending).status, 200);
+});
+
+test("sharing previews the latest saved board read-only and copies its clean viewer address", async () => {
+  const stamp = new Date().toISOString();
+  const board = {
+    id: "11111111-1111-4111-8111-111111111111",
+    code: "820278",
+    title: "Menu",
+    claimed: true,
+    access: "owner",
+    invited_email: "viewer@example.com",
+    updated_at: stamp,
+    tasks: [
+      {
+        id: "22222222-2222-4222-8222-222222222222",
+        board_id: "11111111-1111-4111-8111-111111111111",
+        title: "Current saved item",
+        note: "",
+        status: "pending",
+        assigned_to: null,
+        sort_order: 1024,
+        created_at: stamp,
+        updated_at: stamp,
+        completed_at: null,
+      },
+    ],
+  };
+  let reads = 0,
+    copied = "";
+  Object.defineProperty(navigator, "clipboard", {
+    configurable: true,
+    value: {
+      async writeText(text: string) {
+        copied = text;
+      },
+    },
+  });
+  transport.request = async (path) =>
+    path === "/api/memos"
+      ? Response.json({
+          boards: [board],
+          email: "owner@example.com",
+          emailReady: true,
+        })
+      : (reads++,
+        Response.json({
+          ...board,
+          tasks: board.tasks.map((task) => ({
+            ...task,
+            title: reads > 1 ? "Latest saved item" : task.title,
+          })),
+        }));
+  window.history.replaceState(null, "", "/820278");
+  ui.render(createElement(App));
+  await ui.waitFor(() =>
+    assert.ok(ui.screen.getByRole("button", { name: "Share board" })),
+  );
+  ui.fireEvent.click(ui.screen.getByRole("button", { name: "Share board" }));
+  await ui.waitFor(() =>
+    assert.ok(ui.screen.getByRole("button", { name: "Preview their view" })),
+  );
+  await ui.act(async () => {
+    ui.fireEvent.click(
+      ui.screen.getByRole("button", { name: "Preview their view" }),
+    );
+  });
+  const preview = ui.screen.getByRole("dialog", { name: "Viewer preview" });
+  assert.ok(ui.within(preview).getByText("Latest saved item"));
+  assert.equal(
+    ui.within(preview).queryByRole("button", { name: "Add item" }),
+    null,
+  );
+  assert.equal(
+    ui.within(preview).queryByRole("button", { name: /Complete Latest/ }),
+    null,
+  );
+  ui.fireEvent.click(
+    ui.screen.getByRole("button", { name: "← Back to sharing" }),
+  );
+  await ui.act(async () => {
+    ui.fireEvent.click(
+      ui.screen.getByRole("button", { name: "Copy viewer link" }),
+    );
+  });
+  assert.equal(copied, "https://little.test/820278");
 });

@@ -58,6 +58,7 @@ before(async () => {
     "MutationObserver",
     "getComputedStyle",
     "localStorage",
+    "sessionStorage",
   ] as const) {
     Object.defineProperty(globalThis, key, {
       configurable: true,
@@ -98,6 +99,7 @@ afterEach(() => {
   ui.cleanup();
   globalThis.fetch = originalFetch;
   localStorage.clear();
+  sessionStorage.clear();
   noteWidth = 250;
 });
 
@@ -1006,4 +1008,246 @@ test("a lost batch response reconciles every imported task including checklist a
   assert.equal(writes, 1);
   assert.equal(result.current.board.tasks.length, 2);
   assert.deepEqual(result.current.board.tasks[1].checklist, imported.checklist);
+});
+
+test("pasted suggestions can merge and split without losing the original message", async () => {
+  let saved: Partial<Task>[] = [];
+  ui.render(
+    createElement(PasteRequest, {
+      onClose() {},
+      async onAdd(items) {
+        saved = items;
+        return true;
+      },
+    }),
+  );
+  ui.fireEvent.change(
+    ui.screen.getByRole("textbox", { name: "Client request" }),
+    {
+      target: {
+        value: "Changes:\n- Update photo\n- Update title\n- Export PDF",
+      },
+    },
+  );
+  ui.fireEvent.click(ui.screen.getByRole("button", { name: "Review items" }));
+  ui.fireEvent.click(
+    ui.screen.getByRole("checkbox", { name: "Select suggested item 1" }),
+  );
+  ui.fireEvent.click(
+    ui.screen.getByRole("checkbox", { name: "Select suggested item 2" }),
+  );
+  ui.fireEvent.click(
+    ui.screen.getByRole("button", { name: "Merge selected (2)" }),
+  );
+  assert.equal(
+    (
+      ui.screen.getByRole("textbox", {
+        name: "Suggested item 1",
+      }) as HTMLTextAreaElement
+    ).value,
+    "Update photo; Update title",
+  );
+  ui.fireEvent.click(
+    ui.screen.getByRole("button", { name: "Split suggested item 1" }),
+  );
+  ui.fireEvent.change(
+    ui.screen.getByRole("textbox", { name: "Split into steps" }),
+    { target: { value: "Update photo\nUpdate heading" } },
+  );
+  ui.fireEvent.click(
+    ui.screen.getByRole("button", { name: "Use these steps" }),
+  );
+  await ui.act(async () => {
+    ui.fireEvent.click(ui.screen.getByRole("button", { name: "Add 3 items" }));
+  });
+  assert.deepEqual(
+    saved.map((item) => item.title),
+    ["Update photo", "Update heading", "Export PDF"],
+  );
+  assert.match(saved[0].original_request!, /Update title/);
+});
+
+test("paste review survives remounting in the same tab and can be deliberately discarded", async () => {
+  const props = {
+    boardId: "recovery-board",
+    onClose() {},
+    async onAdd() {
+      return false;
+    },
+  };
+  let view = ui.render(createElement(PasteRequest, props));
+  ui.fireEvent.change(
+    ui.screen.getByRole("textbox", { name: "Client request" }),
+    { target: { value: "- Keep my text\n- Send PDF" } },
+  );
+  ui.fireEvent.click(ui.screen.getByRole("button", { name: "Review items" }));
+  ui.fireEvent.change(
+    ui.screen.getByRole("textbox", { name: "Suggested item 1" }),
+    { target: { value: "Keep the corrected text" } },
+  );
+  ui.fireEvent.click(
+    ui.screen.getByRole("button", { name: "Split suggested item 1" }),
+  );
+  ui.fireEvent.change(
+    ui.screen.getByRole("textbox", { name: "Split into steps" }),
+    { target: { value: "First corrected step\nSecond corrected step" } },
+  );
+  view.unmount();
+  view = ui.render(createElement(PasteRequest, props));
+  assert.equal(
+    (
+      ui.screen.getByRole("textbox", {
+        name: "Split into steps",
+      }) as HTMLTextAreaElement
+    ).value,
+    "First corrected step\nSecond corrected step",
+  );
+  assert.equal(
+    (
+      ui.screen.getByRole("textbox", {
+        name: "Suggested item 1",
+      }) as HTMLTextAreaElement
+    ).value,
+    "Keep the corrected text",
+  );
+  ui.fireEvent.click(ui.screen.getByRole("button", { name: "Discard" }));
+  view.unmount();
+  ui.render(createElement(PasteRequest, props));
+  assert.equal(
+    (
+      ui.screen.getByRole("textbox", {
+        name: "Client request",
+      }) as HTMLTextAreaElement
+    ).value,
+    "",
+  );
+});
+
+test("Enter inserts the next checklist step and saving drops blank steps", async () => {
+  let saved: Partial<Task> = {};
+  ui.render(
+    createElement(TaskEditor, {
+      task,
+      onCancel() {},
+      async onSave(patch) {
+        saved = patch;
+        return true;
+      },
+    }),
+  );
+  ui.fireEvent.click(ui.screen.getByRole("button", { name: "Add details" }));
+  ui.fireEvent.click(
+    ui.screen.getByRole("button", { name: "Add a checklist" }),
+  );
+  ui.fireEvent.change(
+    ui.screen.getByRole("textbox", { name: "Checklist step 1" }),
+    { target: { value: "First change" } },
+  );
+  ui.fireEvent.keyDown(
+    ui.screen.getByRole("textbox", { name: "Checklist step 1" }),
+    { key: "Enter" },
+  );
+  assert.ok(ui.screen.getByRole("textbox", { name: "Checklist step 2" }));
+  assert.equal(saved.title, undefined);
+  await ui.act(async () => {
+    ui.fireEvent.submit(ui.screen.getByRole("form", { name: "Edit item" }));
+  });
+  assert.deepEqual(
+    saved.checklist!.map((step) => step.title),
+    ["First change"],
+  );
+});
+
+test("unsaved owner edits and quick-add text recover after reopening while viewers cannot see drafts", async () => {
+  globalThis.fetch = async () => response(initial);
+  let view = ui.render(createElement(MemoBoard, { initial, mode: "owner" }));
+  ui.fireEvent.click(ui.screen.getByRole("button", { name: task.title }));
+  ui.fireEvent.change(ui.screen.getByRole("textbox", { name: "Item title" }), {
+    target: { value: "Recover this edit" },
+  });
+  view.unmount();
+  view = ui.render(createElement(MemoBoard, { initial, mode: "viewer" }));
+  assert.equal(ui.screen.queryByText("Unsaved edit"), null);
+  view.unmount();
+  view = ui.render(createElement(MemoBoard, { initial, mode: "owner" }));
+  assert.ok(ui.screen.getByText("Unsaved edit"));
+  ui.fireEvent.click(ui.screen.getByRole("button", { name: task.title }));
+  assert.equal(
+    (ui.screen.getByRole("textbox", { name: "Item title" }) as HTMLInputElement)
+      .value,
+    "Recover this edit",
+  );
+  ui.fireEvent.click(ui.screen.getByRole("button", { name: "Cancel" }));
+  ui.fireEvent.click(ui.screen.getByRole("button", { name: "Add item" }));
+  ui.fireEvent.change(ui.screen.getByRole("textbox", { name: "Item title" }), {
+    target: { value: "Recover new item" },
+  });
+  view.unmount();
+  ui.render(createElement(MemoBoard, { initial, mode: "owner" }));
+  assert.equal(
+    (ui.screen.getByRole("textbox", { name: "Item title" }) as HTMLInputElement)
+      .value,
+    "Recover new item",
+  );
+});
+
+test("viewer search finds checklist steps and opens matching cards without exposing write controls", async () => {
+  const grouped: Task = {
+    ...task,
+    title: "Menu",
+    checklist: [
+      { id: crypto.randomUUID(), title: "Replace cover image", done: false },
+    ],
+  };
+  const view = ui.render(
+    createElement(MemoBoard, {
+      initial: {
+        ...initial,
+        tasks: [
+          grouped,
+          { ...task, id: crypto.randomUUID(), title: "Other item" },
+        ],
+      },
+      mode: "viewer",
+      demo: true,
+    }),
+  );
+  ui.fireEvent.click(ui.screen.getByRole("button", { name: "Search board" }));
+  ui.fireEvent.change(
+    ui.screen.getByRole("searchbox", { name: "Find items" }),
+    { target: { value: "cover image" } },
+  );
+  assert.equal(ui.screen.queryByText("Other item"), null);
+  assert.ok(ui.screen.getByText("Replace cover image"));
+  assert.equal(
+    view.container.querySelector(".task-checklist")!.getAttribute("open"),
+    "",
+  );
+  assert.equal(ui.screen.queryByRole("button", { name: "Add item" }), null);
+  assert.equal(ui.screen.queryByRole("checkbox"), null);
+});
+
+test("a failed save offers one explicit retry and clears the failure after success", async () => {
+  let attempts = 0;
+  globalThis.fetch = async () => {
+    attempts++;
+    return attempts === 1
+      ? response({ error: "Offline" }, 503)
+      : response({ ...initial, tasks: [{ ...task, status: "waiting" }] });
+  };
+  const { result } = ui.renderHook(() => useMemoMutations(initial, false));
+  await ui.act(async () => {
+    await result.current.change("update", {
+      id: task.id,
+      patch: { status: "waiting" },
+    });
+  });
+  assert.equal(result.current.canRetry, true);
+  await ui.act(async () => {
+    assert.equal(await result.current.retryLast(), true);
+  });
+  assert.equal(attempts, 2);
+  assert.equal(result.current.canRetry, false);
+  assert.equal(result.current.error, "");
+  assert.equal(result.current.board.tasks[0].status, "waiting");
 });
