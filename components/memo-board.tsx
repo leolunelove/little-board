@@ -87,7 +87,9 @@ export function MemoBoard({
   demo = false,
   personalActions,
   embedded = false,
+  onBack,
 }: {
+  onBack?: () => void;
   embedded?: boolean;
   initial: Board;
   mode: Mode;
@@ -338,7 +340,8 @@ export function MemoBoard({
     if (!(await settleUndo())) return;
     try {
       if (signOut && !demo) await api("/api/auth/logout", "POST");
-      navigate();
+      if (onBack && !signOut) onBack();
+      else navigate();
     } catch (e) {
       setError((e as Error).message);
     }
@@ -650,7 +653,7 @@ export function MemoBoard({
             disabled={busy || addDirty || Boolean(editing)}
             onClick={() => void leaveEditor()}
           >
-            ‹ Boards
+            {onBack ? "‹ All items" : "‹ Boards"}
           </button>
           <span className="board-number">{initial.code}</span>
           {writable ? (
@@ -1363,9 +1366,11 @@ function Section({
     </section>
   );
 }
-function TaskRow({
+export function TaskRow({
   initiallyOpen = false,
   list = false,
+  hideDrag = false,
+  sourceLabel,
   personal = false,
   task,
   draft,
@@ -1390,6 +1395,8 @@ function TaskRow({
   task: Task;
   initiallyOpen?: boolean;
   list?: boolean;
+  hideDrag?: boolean;
+  sourceLabel?: React.ReactNode;
   personal?: boolean;
   draft?: Partial<Task>;
   onDraftChange: (id: string, draft: Partial<Task> | null) => void;
@@ -1518,6 +1525,7 @@ function TaskRow({
             {draft && writable && (
               <span className="unsaved-label">Unsaved edit</span>
             )}
+            {sourceLabel}
             {list && (
               <span className={`list-status list-status-${task.status}`}>
                 {labels[task.status]}
@@ -1563,17 +1571,19 @@ function TaskRow({
                   setMenu(false);
               }}
             >
-              <button
-                ref={setActivatorNodeRef}
-                className="drag-handle icon-button"
-                title="Drag to move · or use arrow keys after pressing Space"
-                aria-label={`Reorder ${task.title}`}
-                {...attributes}
-                {...listeners}
-                disabled={dragDisabled}
-              >
-                <GripVertical size={16} />
-              </button>
+              {!hideDrag && (
+                <button
+                  ref={setActivatorNodeRef}
+                  className="drag-handle icon-button"
+                  title="Drag to move · or use arrow keys after pressing Space"
+                  aria-label={`Reorder ${task.title}`}
+                  {...attributes}
+                  {...listeners}
+                  disabled={dragDisabled}
+                >
+                  <GripVertical size={16} />
+                </button>
+              )}
               <button
                 ref={menuButton}
                 className="icon-button more-button"
@@ -1609,26 +1619,30 @@ function TaskRow({
                       </option>
                     ))}
                   </select>
-                  <button
-                    disabled={busy || !canMoveUp}
-                    onClick={() => {
-                      onMove(-1);
-                      setMenu(false);
-                    }}
-                  >
-                    <ArrowUp size={15} />
-                    Move up
-                  </button>
-                  <button
-                    disabled={busy || !canMoveDown}
-                    onClick={() => {
-                      onMove(1);
-                      setMenu(false);
-                    }}
-                  >
-                    <ArrowDown size={15} />
-                    Move down
-                  </button>
+                  {!hideDrag && (
+                    <>
+                      <button
+                        disabled={busy || !canMoveUp}
+                        onClick={() => {
+                          onMove(-1);
+                          setMenu(false);
+                        }}
+                      >
+                        <ArrowUp size={15} />
+                        Move up
+                      </button>
+                      <button
+                        disabled={busy || !canMoveDown}
+                        onClick={() => {
+                          onMove(1);
+                          setMenu(false);
+                        }}
+                      >
+                        <ArrowDown size={15} />
+                        Move down
+                      </button>
+                    </>
+                  )}
                   <button
                     className="danger"
                     onClick={() => {

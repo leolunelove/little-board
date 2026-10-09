@@ -9,12 +9,14 @@ import {
   Link2,
 } from "lucide-react";
 import { AppearanceControl } from "./appearance-control";
+import { AllItems } from "./all-items";
 import { MemoBoard } from "./memo-board";
 import { MagicLinkForm } from "./magic-link-form";
 import { Sheet } from "./sheet";
 import { memoRequest } from "@/lib/client-api";
 import {
   currentCode,
+  isAllItems,
   navigate,
   CODE,
   boardUrl,
@@ -46,6 +48,8 @@ function updatedLabel(value: string) {
 }
 
 export function LittleBoardApp() {
+  const [allItems, setAllItems] = useState(false);
+  const [returnToAll, setReturnToAll] = useState(false);
   const [code, setCode] = useState<string | null>(null),
     [board, setBoard] = useState<Board | null>(null),
     [boards, setBoards] = useState<Board[]>([]);
@@ -65,8 +69,12 @@ export function LittleBoardApp() {
   const load = useCallback(async () => {
     const version = ++generation.current;
     const selected = currentCode();
+    setAllItems(isAllItems());
+    setReturnToAll(
+      new URLSearchParams(window.location.search).get("from") === "all",
+    );
     setCode(selected);
-    setOpening(Boolean(selected));
+    setOpening(Boolean(selected) || isAllItems());
     setError("");
     try {
       const info = await memoRequest("/api/memos");
@@ -209,6 +217,21 @@ export function LittleBoardApp() {
       <span className="brand-period">.</span>
     </button>
   );
+  if (allItems && opening)
+    return (
+      <main className="little-opening">
+        {brand}
+        <p role="status">Opening all items…</p>
+      </main>
+    );
+  if (allItems)
+    return (
+      <AllItems
+        key={email || "guest"}
+        initial={boards}
+        initialWarning={error}
+      />
+    );
   if (code && opening)
     return (
       <main className="little-opening">
@@ -225,6 +248,7 @@ export function LittleBoardApp() {
         <MemoBoard
           key={`${board.id}:${board.claimed}:${board.invited_email}`}
           initial={board}
+          onBack={returnToAll ? () => navigate("all") : undefined}
           mode={board.access || "owner"}
           personalActions={{
             onClaim: () => {
@@ -483,6 +507,13 @@ export function LittleBoardApp() {
               {error}
             </p>
           )}
+          <button className="all-items-entry" onClick={() => navigate("all")}>
+            <span>
+              <strong>All items</strong>
+              <small>Work across all your boards</small>
+            </span>
+            <ArrowRight size={19} />
+          </button>
           <section className="little-dashboard-boards" aria-label="Your boards">
             {boards.length ? (
               boards.map((b) => {
@@ -638,6 +669,12 @@ export function LittleBoardApp() {
           </section>
           {!login && !code && boards.length > 0 && (
             <section className="little-recents" aria-label="Your boards">
+              <button
+                className="all-items-entry"
+                onClick={() => navigate("all")}
+              >
+                All items <ArrowRight size={18} />
+              </button>
               <h2>Pick up where you left off</h2>
               {boards.map((b) => (
                 <button

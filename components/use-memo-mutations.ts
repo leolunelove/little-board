@@ -13,7 +13,11 @@ type Undo = {
 };
 type Transform = (board: Board) => Board;
 
-export function useMemoMutations(initial: Board, demo: boolean) {
+export function useMemoMutations(
+  initial: Board,
+  demo: boolean,
+  request = transport.request,
+) {
   const writePath = initial.code ? `/api/memos/${initial.code}` : "/api/tasks";
   const readPath = initial.code ? `/api/memos/${initial.code}` : "/api/board";
   const [board, setBoardState] = useState(initial);
@@ -72,7 +76,7 @@ export function useMemoMutations(initial: Board, demo: boolean) {
           });
         try {
           if (!demo) {
-            const response = await transport.request(writePath, {
+            const response = await request(writePath, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ action, ...payload }),
@@ -95,7 +99,7 @@ export function useMemoMutations(initial: Board, demo: boolean) {
             (action === "add" || action === "add_many" || action === "delete")
           ) {
             try {
-              const response = await transport.request(readPath, {
+              const response = await request(readPath, {
                 cache: "no-store",
               });
               if (response.ok) {
@@ -159,7 +163,7 @@ export function useMemoMutations(initial: Board, demo: boolean) {
       queue.current = result;
       return result;
     },
-    [demo, setBoard, writePath, readPath],
+    [demo, setBoard, writePath, readPath, request],
   );
 
   const commitDeletion = useCallback(
@@ -301,14 +305,12 @@ export function useMemoMutations(initial: Board, demo: boolean) {
       if (mounted.current) setUndoState(null);
       if (timer.current) clearTimeout(timer.current);
       if (!demo)
-        void transport
-          .request(writePath, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ action: "delete", id: entry.task.id }),
-            keepalive: true,
-          })
-          .catch(() => {});
+        void request(writePath, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "delete", id: entry.task.id }),
+          keepalive: true,
+        }).catch(() => {});
     };
     window.addEventListener("pagehide", flush);
     return () => {
@@ -317,7 +319,7 @@ export function useMemoMutations(initial: Board, demo: boolean) {
       flush();
       if (timer.current) clearTimeout(timer.current);
     };
-  }, [demo, writePath]);
+  }, [demo, writePath, request]);
 
   return {
     board,
