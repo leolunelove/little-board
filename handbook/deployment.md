@@ -1,19 +1,19 @@
 # Deploy Little Board
 
-## GitHub Pages
+## GitHub Pages — current hosting
 
-The live app is [leolunelove.github.io/little-board](https://leolunelove.github.io/little-board/). Its source is in [leolunelove/little-board](https://github.com/leolunelove/little-board). The **Publish Little Board** GitHub Actions workflow runs tests, builds the static site at `/little-board`, and publishes `out/`. Run it manually after merging a release. Pages should use **GitHub Actions** as its source.
+The live app is [littleboard.cc](https://littleboard.cc/). The source is in [leolunelove/little-board](https://github.com/leolunelove/little-board). GitHub Actions runs the tests, builds the static site at the custom-domain root, and publishes `out/` when **Publish Little Board** is dispatched. Keep Pages configured for **GitHub Actions**.
 
-Guest board data stays in each browser until claimed with email. Pushing or redeploying does not move unclaimed boards between browsers or hosting origins. Never commit task data, SMTP keys, sign-in credentials or private backups.
+Guest board data stays in each browser until the owner claims it with email. A GitHub push or redeploy does not migrate guest boards between browsers or hosting origins. No task data, sign-in credentials, SMTP keys or private backups belong in this repository or deployment.
 
-## Email release
+## Email and stored boards
 
-Complete [email setup](email-setup.md) before setting GitHub variable `EMAIL_ENABLED=true` and running the Pages workflow. Brevo sends mail through Supabase custom SMTP. GitHub builds the public app and needs no SMTP secret. Verify a real magic-link round trip and the invited reader's read-only access before announcing email sign-in.
+Complete [email setup](email-setup.md) before setting the repository variable `EMAIL_ENABLED=true` and running the Pages workflow. The configured email provider sends mail through Supabase custom SMTP; GitHub only builds the public app. Keep the SMTP key inside Supabase. Verify a real magic-link round trip and database isolation with two emails before treating the email feature as live.
 
-## Release and rollback
+## Release
 
-1. Update `main` and confirm checks pass.
+1. Update the source on `main` and confirm checks pass.
 2. Run **Publish Little Board** in GitHub Actions.
-3. Confirm the deployment succeeds and open the live URL in a fresh browser.
+3. Confirm the workflow's deployment job succeeds and open the live address in a fresh browser.
 
-To roll back, publish an earlier known-good commit. Do not rerun database schema creation or alter user data as part of a code rollback.
+To roll back, redeploy an earlier known-good commit. Do not rerun schema creation or modify user data as part of a code rollback.
