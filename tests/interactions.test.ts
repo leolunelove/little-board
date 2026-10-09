@@ -1584,16 +1584,32 @@ test("All items refreshes on focus but preserves an active edit", async () => {
   let reads = 0;
   globalThis.fetch = async () => {
     reads++;
-    return response({ boards: [{ ...owned, tasks: [{ ...task, title: "Updated elsewhere" }] }] });
+    return response({
+      boards: [{ ...owned, tasks: [{ ...task, title: "Updated elsewhere" }] }],
+    });
   };
   ui.render(createElement(AllItems, { initial: [owned] }));
-  ui.fireEvent.click(ui.screen.getByRole("button", { name: task.title, exact: true }));
-  ui.fireEvent.change(ui.screen.getByRole("textbox", { name: "Item title" }), { target: { value: "My unfinished edit" } });
-  await ui.act(async () => window.dispatchEvent(new window.Event("focus")));
+  ui.fireEvent.click(
+    ui.screen.getByRole("button", { name: task.title }),
+  );
+  ui.fireEvent.change(ui.screen.getByRole("textbox", { name: "Item title" }), {
+    target: { value: "My unfinished edit" },
+  });
+  await ui.act(async () => {
+    window.dispatchEvent(new window.Event("focus"));
+  });
   assert.equal(reads, 0);
-  assert.equal((ui.screen.getByRole("textbox", { name: "Item title" }) as HTMLInputElement).value, "My unfinished edit");
-  ui.fireEvent.click(ui.screen.getByRole("button", { name: "Cancel", exact: true }));
-  await ui.act(async () => window.dispatchEvent(new window.Event("focus")));
+  assert.equal(
+    (ui.screen.getByRole("textbox", { name: "Item title" }) as HTMLInputElement)
+      .value,
+    "My unfinished edit",
+  );
+  ui.fireEvent.click(
+    ui.screen.getByRole("button", { name: "Cancel" }),
+  );
+  await ui.act(async () => {
+    window.dispatchEvent(new window.Event("focus"));
+  });
   assert.equal(reads, 1);
   assert.ok(ui.screen.getByText("Updated elsewhere"));
 });
