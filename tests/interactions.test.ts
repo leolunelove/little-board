@@ -1333,3 +1333,155 @@ test("checklist notes are tucked inside the expandable card for viewers", async 
   );
   assert.equal(rendered.container.querySelector(".task-note-line"), null);
 });
+
+test("List view compiles rows and expands steps without viewer editing controls, and remembers the choice", () => {
+  const board = {
+    ...initial,
+    tasks: [
+      {
+        ...task,
+        checklist: [{ id: "step", title: "Export the film", done: false }],
+      },
+    ],
+  };
+  const screen = ui.render(
+    createElement(MemoBoard, { initial: board, mode: "viewer", demo: true }),
+  );
+  ui.fireEvent.click(ui.screen.getByRole("button", { name: "List" }));
+  assert.ok(ui.screen.getByRole("region", { name: "All items" }));
+  assert.equal(ui.screen.queryByRole("region", { name: "Pending" }), null);
+  assert.ok(screen.container.querySelector("details.task-checklist[open]"));
+  assert.equal(ui.screen.queryByRole("button", { name: "Add item" }), null);
+  assert.equal(ui.screen.queryByRole("checkbox"), null);
+  assert.ok(
+    ui.screen.getByRole("button", { name: `Show note for ${task.title}` }),
+  );
+  screen.unmount();
+  ui.render(
+    createElement(MemoBoard, { initial: board, mode: "viewer", demo: true }),
+  );
+  assert.equal(
+    ui.screen
+      .getByRole("button", { name: "List" })
+      .getAttribute("aria-pressed"),
+    "true",
+  );
+});
+
+test("switching layouts preserves an unfinished add and copy only includes saved search matches", async () => {
+  const copied: string[] = [];
+  const previous = Object.getOwnPropertyDescriptor(navigator, "clipboard");
+  Object.defineProperty(navigator, "clipboard", {
+    configurable: true,
+    value: {
+      async writeText(text: string) {
+        copied.push(text);
+      },
+    },
+  });
+  try {
+    ui.render(createElement(MemoBoard, { initial, mode: "owner", demo: true }));
+    ui.fireEvent.click(ui.screen.getByRole("button", { name: "Add item" }));
+    ui.fireEvent.change(
+      ui.screen.getByRole("textbox", { name: "Item title" }),
+      { target: { value: "Unfinished" } },
+    );
+    ui.fireEvent.click(ui.screen.getByRole("button", { name: "List" }));
+    assert.equal(
+      (
+        ui.screen.getByRole("textbox", {
+          name: "Item title",
+        }) as HTMLInputElement
+      ).value,
+      "Unfinished",
+    );
+    assert.equal(
+      (
+        ui.screen.getByRole("button", {
+          name: "Copy list",
+        }) as HTMLButtonElement
+      ).disabled,
+      true,
+    );
+    ui.fireEvent.click(ui.screen.getByRole("button", { name: "Cancel" }));
+    ui.fireEvent.click(ui.screen.getByRole("button", { name: "Search board" }));
+    ui.fireEvent.change(
+      ui.screen.getByRole("searchbox", { name: "Find items" }),
+      { target: { value: "film" } },
+    );
+    ui.fireEvent.click(ui.screen.getByRole("button", { name: "Copy results" }));
+    await ui.waitFor(() => assert.equal(copied.length, 1));
+    assert.ok(copied[0].includes(task.title));
+    assert.ok(!copied[0].includes("Unfinished"));
+  } finally {
+    if (previous) Object.defineProperty(navigator, "clipboard", previous);
+    else Reflect.deleteProperty(navigator, "clipboard");
+  }
+});
+
+test("blocked clipboard offers selectable list text and embedded preview omits sample footer", async () => {
+  ui.render(
+    createElement(MemoBoard, {
+      initial,
+      mode: "viewer",
+      demo: true,
+      embedded: true,
+    }),
+  );
+  assert.equal(
+    ui.screen.queryByText("Sample board · changes aren’t saved"),
+    null,
+  );
+  ui.fireEvent.click(ui.screen.getByRole("button", { name: "List" }));
+  ui.fireEvent.click(ui.screen.getByRole("button", { name: "Copy list" }));
+  await ui.waitFor(() =>
+    assert.ok(ui.screen.getByRole("dialog", { name: "Copy your list" })),
+  );
+  assert.ok(
+    (
+      ui.screen.getByRole("textbox", {
+        name: "List to copy",
+      }) as HTMLTextAreaElement
+    ).value.includes(task.title),
+  );
+});
+
+test("searching disables positional movement so hidden rows cannot be reordered by mistake", () => {
+  const board = {
+    ...initial,
+    tasks: [
+      task,
+      {
+        ...task,
+        id: crypto.randomUUID(),
+        sort_order: 2048,
+        title: "Finish second film",
+      },
+    ],
+  };
+  ui.render(
+    createElement(MemoBoard, { initial: board, mode: "owner", demo: true }),
+  );
+  ui.fireEvent.click(ui.screen.getByRole("button", { name: "List" }));
+  ui.fireEvent.click(ui.screen.getByRole("button", { name: "Search board" }));
+  ui.fireEvent.change(
+    ui.screen.getByRole("searchbox", { name: "Find items" }),
+    { target: { value: "film" } },
+  );
+  ui.fireEvent.click(
+    ui.screen.getByRole("button", { name: `Options for ${task.title}` }),
+  );
+  assert.equal(
+    (ui.screen.getByRole("button", { name: "Move down" }) as HTMLButtonElement)
+      .disabled,
+    true,
+  );
+  assert.equal(
+    (
+      ui.screen.getByRole("combobox", {
+        name: `Status for ${task.title}`,
+      }) as HTMLSelectElement
+    ).disabled,
+    false,
+  );
+});
