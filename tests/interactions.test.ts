@@ -1485,3 +1485,115 @@ test("searching disables positional movement so hidden rows cannot be reordered 
     false,
   );
 });
+
+test("All items edits the original board and never exposes shared-board editing", async () => {
+  const { AllItems, sourceBoard } = await import("../components/all-items");
+  const owned: Board = { ...initial, code: "123456", access: "owner" };
+  const shared: Board = {
+    ...initial,
+    id: "shared",
+    code: "654321",
+    title: "Client board",
+    access: "viewer",
+    tasks: [
+      {
+        ...task,
+        id: "shared-task",
+        board_id: "shared",
+        title: "Read only task",
+      },
+    ],
+  };
+  assert.throws(
+    () => sourceBoard([owned, shared], { action: "update", id: "shared-task" }),
+    /only edit/,
+  );
+  assert.equal(
+    sourceBoard([owned, shared], {
+      action: "add",
+      task: { board_id: owned.id },
+    }).code,
+    owned.code,
+  );
+  const calls: string[] = [];
+  globalThis.fetch = async (url, options) => {
+    calls.push(String(url));
+    const command = JSON.parse(String(options?.body));
+    assert.equal(command.id, task.id);
+    return response({ ...owned, tasks: [{ ...task, ...command.patch }] });
+  };
+  window.scrollTo = () => {};
+  ui.render(createElement(AllItems, { initial: [owned, shared] }));
+  assert.equal(
+    ui.screen.queryByRole("button", { name: "Complete Read only task" }),
+    null,
+  );
+  const completeButton = ui.screen.getByRole("button", {
+    name: /Complete Finish the film/,
+  });
+  await ui.act(async () => ui.fireEvent.click(completeButton));
+  assert.deepEqual(calls, ["/api/memos/123456"]);
+  assert.ok(ui.screen.getByText("Read only task"));
+  await ui.act(async () =>
+    ui.fireEvent.click(ui.screen.getByRole("button", { name: "Undo" })),
+  );
+  assert.equal(calls.length, 2);
+});
+
+test("All items quick add chooses an original board and filters without losing other boards", async () => {
+  const { AllItems } = await import("../components/all-items");
+  const first: Board = { ...initial, code: "123456", access: "owner" };
+  const second: Board = {
+    ...initial,
+    id: "second",
+    code: "654321",
+    title: "Second board",
+    access: "owner",
+    tasks: [],
+  };
+  let added: Task | undefined;
+  globalThis.fetch = async (url, options) => {
+    assert.equal(String(url), "/api/memos/654321");
+    added = JSON.parse(String(options?.body)).task;
+    return response({ ...second, tasks: [added] });
+  };
+  ui.render(createElement(AllItems, { initial: [first, second] }));
+  ui.fireEvent.click(ui.screen.getByRole("button", { name: "Add item" }));
+  ui.fireEvent.change(
+    ui.screen.getByRole("combobox", { name: "Add to board" }),
+    { target: { value: "second" } },
+  );
+  ui.fireEvent.change(ui.screen.getByRole("textbox", { name: "Item title" }), {
+    target: { value: "New second-board task" },
+  });
+  await ui.act(async () =>
+    ui.fireEvent.submit(ui.screen.getByRole("form", { name: "Add item" })),
+  );
+  assert.equal(added?.board_id, "second");
+  assert.ok(ui.screen.getByText("New second-board task"));
+  assert.ok(ui.screen.getByText(task.title));
+  ui.fireEvent.change(ui.screen.getByRole("combobox", { name: "Show board" }), {
+    target: { value: "second" },
+  });
+  assert.equal(ui.screen.queryByText(task.title), null);
+});
+
+test("All items refreshes on focus but preserves an active edit", async () => {
+  const { AllItems } = await import("../components/all-items");
+  const owned: Board = { ...initial, code: "123456", access: "owner" };
+  let reads = 0;
+  globalThis.fetch = async () => {
+    reads++;
+    return response({ boards: [{ ...owned, tasks: [{ ...task, title: "Updated elsewhere" }] }] });
+  };
+  ui.render(createElement(AllItems, { initial: [owned] }));
+  ui.fireEvent.click(ui.screen.getByRole("button", { name: task.title, exact: true }));
+  ui.fireEvent.change(ui.screen.getByRole("textbox", { name: "Item title" }), { target: { value: "My unfinished edit" } });
+  await ui.act(async () => window.dispatchEvent(new window.Event("focus")));
+  assert.equal(reads, 0);
+  assert.equal((ui.screen.getByRole("textbox", { name: "Item title" }) as HTMLInputElement).value, "My unfinished edit");
+  ui.fireEvent.click(ui.screen.getByRole("button", { name: "Cancel", exact: true }));
+  await ui.act(async () => window.dispatchEvent(new window.Event("focus")));
+  assert.equal(reads, 1);
+  assert.ok(ui.screen.getByText("Updated elsewhere"));
+});
