@@ -44,8 +44,11 @@ import {
   EyeOff,
   ClipboardPaste,
   Search,
+  Copy,
 } from "lucide-react";
 import type { Board, Task, Status, Mode } from "@/lib/types";
+import { boardList, formatBoardList } from "@/lib/board-list";
+import { Sheet } from "@/components/sheet";
 import { isArchived } from "@/lib/archive";
 import { RedactedText } from "@/components/redacted-text";
 import { TaskEditor } from "@/components/task-editor";
@@ -111,6 +114,8 @@ export function MemoBoard({
   } = useMemoMutations(initial, demo);
   const writable = mode !== "viewer";
   const [query, setQuery] = useState("");
+  const [copyFallback, setCopyFallback] = useState<string | null>(null);
+  const [copyBusy, setCopyBusy] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [newChecklists, setNewChecklists] = useState<string[]>([]);
   const [pasteHint, setPasteHint] = useState(() => {
@@ -138,7 +143,7 @@ export function MemoBoard({
     [link, setLink] = useState(""),
     [shareBusy, setShareBusy] = useState(false),
     [fresh, setFresh] = useState(true);
-  const { collapsed, expandedNotes, toggleDone, toggleNote } =
+  const { collapsed, expandedNotes, toggleDone, toggleNote, view, setView } =
     useReadingPreferences(initial.id, demo);
   const [showArchive, setShowArchive] = useState(false),
     [now, setNow] = useState(Date.now());
@@ -464,19 +469,78 @@ export function MemoBoard({
     (t) => t.id !== hiddenTaskId && isArchived(t, now),
   );
   const draggedTask = board.tasks.find((task) => task.id === activeId);
-  const searchCount = board.tasks.filter(
-    (task) =>
-      task.id !== hiddenTaskId &&
-      isArchived(task, now) === showArchive &&
-      [
-        task.title,
-        task.note,
-        ...(task.checklist || []).map((step) => step.title),
-      ]
-        .join(" ")
-        .toLocaleLowerCase()
-        .includes(query.trim().toLocaleLowerCase()),
-  ).length;
+  const visibleTasks = boardList(
+    board.tasks,
+    now,
+    showArchive,
+    hiddenTaskId,
+    query,
+  );
+  const searchCount = visibleTasks.length;
+  async function copyList() {
+    const text = formatBoardList(board.title, visibleTasks);
+    setCopyBusy(true);
+    try {
+      await navigator.clipboard.writeText(text);
+      setNotice(query.trim() ? "Matching items copied" : "List copied");
+    } catch {
+      setCopyFallback(text);
+    } finally {
+      setCopyBusy(false);
+    }
+  }
+  const renderTask = (
+    task: Task,
+    tasks: Task[],
+    index: number,
+    list = false,
+  ) => (
+    <TaskRow
+      key={task.id}
+      task={task}
+      list={list}
+      initiallyOpen={
+        list || newChecklists.includes(task.id) || Boolean(query.trim())
+      }
+      personal={Boolean(initial.code)}
+      draft={drafts[task.id]}
+      onDraftChange={rememberDraft}
+      writable={writable}
+      busy={busy}
+      dragDisabled={
+        busy ||
+        Boolean(editing) ||
+        addDirty ||
+        showArchive ||
+        Boolean(query.trim())
+      }
+      dragActive={Boolean(activeId)}
+      reducedMotion={reducedMotion}
+      canMoveUp={
+        !query.trim() &&
+        tasks.slice(0, index).some((item) => item.status === task.status)
+      }
+      canMoveDown={
+        !query.trim() &&
+        tasks.slice(index + 1).some((item) => item.status === task.status)
+      }
+      dropBefore={Boolean(activeId && destination?.beforeId === task.id)}
+      expanded={expandedNotes.includes(task.id) || Boolean(query.trim())}
+      onToggleNote={() => toggleNote(task.id)}
+      editing={editing === task.id}
+      onEdit={() => setEditing(task.id)}
+      onCancel={() => {
+        rememberDraft(task.id, null);
+        setEditing(null);
+        setError("");
+      }}
+      onSave={(patch, fromEditor) => update(task, patch, fromEditor)}
+      onDelete={() => {
+        void remove(task);
+      }}
+      onMove={(offset) => nudge(task, offset)}
+    />
+  );
   const content = (
     <>
       {query.trim() && (
@@ -486,128 +550,92 @@ export function MemoBoard({
             : "No items found. Try another word."}
         </p>
       )}
-      {(showArchive ? (["done"] as Status[]) : statuses).map((status) => {
-        const tasks = board.tasks
-          .filter(
-            (t) =>
-              t.id !== hiddenTaskId &&
-              t.status === status &&
-              isArchived(t, now) === showArchive &&
-              (!query.trim() ||
-                [
-                  t.title,
-                  t.note,
-                  ...(t.checklist || []).map((step) => step.title),
-                ]
-                  .join(" ")
-                  .toLocaleLowerCase()
-                  .includes(query.trim().toLocaleLowerCase())),
-          )
-          .sort((a, b) => a.sort_order - b.sort_order);
-        if (query.trim() && !tasks.length) return null;
-        return (
-          <Section
-            key={status}
-            archived={showArchive}
-            status={status}
-            count={tasks.length}
-            writable={
-              writable &&
-              !showArchive &&
-              !busy &&
-              !editing &&
-              !addDirty &&
-              !query
-            }
-            dropAtEnd={Boolean(
-              activeId &&
-              destination?.status === status &&
-              destination.beforeId === null,
-            )}
-            dragging={Boolean(activeId)}
-            collapseDisabled={busy || Boolean(editing) || Boolean(activeId)}
-            collapsed={
-              !showArchive &&
-              status === "done" &&
-              collapsed &&
-              !activeId &&
-              !query
-            }
-            toggle={toggleDone}
+      {view === "list" ? (
+        <section
+          className="unified-list"
+          aria-label={showArchive ? "Archived list" : "All items"}
+        >
+          <SortableContext
+            items={visibleTasks.map((task) => task.id)}
+            strategy={verticalListSortingStrategy}
           >
-            <SortableContext
-              items={tasks.map((t) => t.id)}
-              strategy={verticalListSortingStrategy}
+            {visibleTasks.map((task, index) =>
+              renderTask(task, visibleTasks, index, true),
+            )}
+          </SortableContext>
+          {!visibleTasks.length && !query.trim() && (
+            <p className="section-empty">
+              {showArchive
+                ? "No archived items yet."
+                : writable
+                  ? "A fresh list. Add your first item below."
+                  : "Nothing on this board yet."}
+            </p>
+          )}
+        </section>
+      ) : (
+        (showArchive ? (["done"] as Status[]) : statuses).map((status) => {
+          const tasks = visibleTasks.filter((task) => task.status === status);
+          if (query.trim() && !tasks.length) return null;
+          return (
+            <Section
+              key={status}
+              archived={showArchive}
+              status={status}
+              count={tasks.length}
+              writable={
+                writable &&
+                !showArchive &&
+                !busy &&
+                !editing &&
+                !addDirty &&
+                !query
+              }
+              dropAtEnd={Boolean(
+                activeId &&
+                destination?.status === status &&
+                destination.beforeId === null,
+              )}
+              dragging={Boolean(activeId)}
+              collapseDisabled={busy || Boolean(editing) || Boolean(activeId)}
+              collapsed={
+                !showArchive &&
+                status === "done" &&
+                collapsed &&
+                !activeId &&
+                !query
+              }
+              toggle={toggleDone}
             >
-              {tasks.map((task, index) => (
-                <TaskRow
-                  key={task.id}
-                  task={task}
-                  initiallyOpen={
-                    newChecklists.includes(task.id) || Boolean(query)
-                  }
-                  personal={Boolean(initial.code)}
-                  draft={drafts[task.id]}
-                  onDraftChange={rememberDraft}
-                  writable={writable}
-                  busy={busy}
-                  dragDisabled={
-                    busy ||
-                    Boolean(editing) ||
-                    addDirty ||
-                    showArchive ||
-                    Boolean(query)
-                  }
-                  dragActive={Boolean(activeId)}
-                  reducedMotion={reducedMotion}
-                  canMoveUp={index > 0}
-                  canMoveDown={index < tasks.length - 1}
-                  dropBefore={Boolean(
-                    activeId && destination?.beforeId === task.id,
-                  )}
-                  expanded={expandedNotes.includes(task.id)}
-                  onToggleNote={() => toggleNote(task.id)}
-                  editing={editing === task.id}
-                  onEdit={() => {
-                    setEditing(task.id);
-                  }}
-                  onCancel={() => {
-                    rememberDraft(task.id, null);
-                    setEditing(null);
-                    setError("");
-                  }}
-                  onSave={(patch, fromEditor) =>
-                    update(task, patch, fromEditor)
-                  }
-                  onDelete={() => {
-                    void remove(task);
-                  }}
-                  onMove={(offset) => nudge(task, offset)}
-                />
-              ))}
-            </SortableContext>
-            {tasks.length === 0 && (
-              <p className="section-empty">
-                {query
-                  ? "No matching items here."
-                  : status === "pending"
-                    ? activeId
-                      ? "Drop here"
-                      : "Nothing pending. A little breathing room."
-                    : status === "waiting"
+              <SortableContext
+                items={tasks.map((t) => t.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                {tasks.map((task, index) => renderTask(task, tasks, index))}
+              </SortableContext>
+              {tasks.length === 0 && (
+                <p className="section-empty">
+                  {query
+                    ? "No matching items here."
+                    : status === "pending"
                       ? activeId
                         ? "Drop here"
-                        : "Nothing waiting."
-                      : showArchive
-                        ? "No archived items yet."
-                        : activeId
+                        : "Nothing pending. A little breathing room."
+                      : status === "waiting"
+                        ? activeId
                           ? "Drop here"
-                          : "Completed items stay here for 24 hours, then move to Archived."}
-              </p>
-            )}
-          </Section>
-        );
-      })}
+                          : "Nothing waiting."
+                        : showArchive
+                          ? "No archived items yet."
+                          : activeId
+                            ? "Drop here"
+                            : "Completed items stay here for 24 hours, then move to Archived."}
+                </p>
+              )}
+            </Section>
+          );
+        })
+      )}
     </>
   );
   return (
@@ -817,6 +845,60 @@ export function MemoBoard({
           </div>
         </div>
       </header>
+      <div className="view-toolbar">
+        <div className="view-switch" role="group" aria-label="Board layout">
+          <button
+            aria-pressed={view === "board"}
+            disabled={busy || Boolean(editing) || Boolean(activeId)}
+            onClick={() => setView("board")}
+          >
+            Board
+          </button>
+          <button
+            aria-pressed={view === "list"}
+            disabled={busy || Boolean(editing) || Boolean(activeId)}
+            onClick={() => setView("list")}
+          >
+            List
+          </button>
+        </div>
+        {view === "list" && (
+          <button
+            className="text-button copy-list"
+            disabled={
+              !visibleTasks.length ||
+              copyBusy ||
+              busy ||
+              Boolean(editing) ||
+              addDirty
+            }
+            onClick={() => void copyList()}
+            title="Copy saved titles, notes and checklist steps as plain text"
+          >
+            <Copy size={14} />
+            {copyBusy
+              ? "Copying…"
+              : query.trim()
+                ? "Copy results"
+                : "Copy list"}
+          </button>
+        )}
+      </div>
+      {copyFallback !== null && (
+        <Sheet title="Copy your list" onClose={() => setCopyFallback(null)}>
+          <p>
+            Your browser couldn’t copy automatically. Select and copy the text
+            below.
+          </p>
+          <textarea
+            className="copy-list-text"
+            aria-label="List to copy"
+            readOnly
+            value={copyFallback}
+            onFocus={(event) => event.currentTarget.select()}
+          />
+        </Sheet>
+      )}
       {searchOpen && (
         <div className="board-search">
           <Search size={16} />
@@ -1166,31 +1248,33 @@ export function MemoBoard({
             : `Archived${archived.length ? " · " + archived.length : ""}`}
         </button>
       )}
-      <footer className="memo-footer" hidden={embedded}>
-        <span className="footer-status">
-          <Check size={12} />
-          {demo
-            ? "Sample board · changes aren’t saved"
-            : writable
-              ? initial.code && !board.claimed
-                ? "Saved on this device."
-                : "Only you can edit."
-              : "Updates automatically"}
-        </span>
-        <div className="footer-controls">
-          <AppearanceControl />
-          {!writable && !initial.code && (
-            <a
-              className="edit-entry"
-              href={demo ? "/preview" : "/admin"}
-              aria-label="Edit memo"
-              title="Sign in to edit"
-            >
-              Edit
-            </a>
-          )}
-        </div>
-      </footer>
+      {!embedded && (
+        <footer className="memo-footer">
+          <span className="footer-status">
+            <Check size={12} />
+            {demo
+              ? "Sample board · changes aren’t saved"
+              : writable
+                ? initial.code && !board.claimed
+                  ? "Saved on this device."
+                  : "Only you can edit."
+                : "Updates automatically"}
+          </span>
+          <div className="footer-controls">
+            <AppearanceControl />
+            {!writable && !initial.code && (
+              <a
+                className="edit-entry"
+                href={demo ? "/preview" : "/admin"}
+                aria-label="Edit memo"
+                title="Sign in to edit"
+              >
+                Edit
+              </a>
+            )}
+          </div>
+        </footer>
+      )}
       {undo && (
         <div className="toast undo-toast" role="status">
           <span>
@@ -1204,7 +1288,10 @@ export function MemoBoard({
           </span>
           <button
             disabled={busy || Boolean(undo.committing)}
-            onClick={() => void undoLast()}
+            onClick={() => {
+              setNotice("");
+              void undoLast();
+            }}
           >
             Undo
           </button>
@@ -1278,6 +1365,7 @@ function Section({
 }
 function TaskRow({
   initiallyOpen = false,
+  list = false,
   personal = false,
   task,
   draft,
@@ -1301,6 +1389,7 @@ function TaskRow({
 }: {
   task: Task;
   initiallyOpen?: boolean;
+  list?: boolean;
   personal?: boolean;
   draft?: Partial<Task>;
   onDraftChange: (id: string, draft: Partial<Task> | null) => void;
@@ -1370,7 +1459,7 @@ function TaskRow({
         setNodeRef(node);
       }}
       data-task-id={task.id}
-      className={`task-row ${task.status} ${isDragging ? "dragging" : ""} ${editing ? "editing" : ""}${dropBefore ? " drop-before" : ""}${task.checklist?.length ? " task-card" : ""}`}
+      className={`task-row ${task.status} ${isDragging ? "dragging" : ""} ${editing ? "editing" : ""}${dropBefore ? " drop-before" : ""}${list ? " list-row" : task.checklist?.length ? " task-card" : ""}`}
     >
       {writable ? (
         <button
@@ -1429,9 +1518,15 @@ function TaskRow({
             {draft && writable && (
               <span className="unsaved-label">Unsaved edit</span>
             )}
-            {task.note && !task.checklist?.length && (
+            {list && (
+              <span className={`list-status list-status-${task.status}`}>
+                {labels[task.status]}
+              </span>
+            )}
+            {task.note && (list || !task.checklist?.length) && (
               <TaskNote
                 task={task}
+                compact={list}
                 expanded={expanded}
                 onToggle={onToggleNote}
               />
@@ -1439,6 +1534,7 @@ function TaskRow({
             <TaskChecklist
               task={task}
               initiallyOpen={initiallyOpen}
+              hideNote={list}
               writable={writable}
               busy={busy}
               onSave={onSave}

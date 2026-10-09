@@ -7,8 +7,10 @@ export function TaskNote({
   task,
   expanded,
   onToggle,
+  compact = false,
 }: {
   task: Pick<Task, "id" | "title" | "note">;
+  compact?: boolean;
   expanded: boolean;
   onToggle: () => void;
 }) {
@@ -35,12 +37,28 @@ export function TaskNote({
     };
   }, [task.note]);
 
-  const open = expanded && overflows;
+  const open = expanded && (overflows || compact);
   const text = (
     <span className="task-note" id={`note-${task.id}`}>
       <RedactedText>{task.note}</RedactedText>
     </span>
   );
+  if (compact)
+    return (
+      <div className="list-note">
+        <button
+          type="button"
+          className="text-button"
+          onClick={onToggle}
+          aria-expanded={expanded}
+          aria-controls={`note-${task.id}`}
+          aria-label={`${expanded ? "Hide" : "Show"} note for ${task.title}`}
+        >
+          {expanded ? "Hide note" : "Note"}
+        </button>
+        {expanded && text}
+      </div>
+    );
   return (
     <div ref={container} className={`task-note-line${open ? " expanded" : ""}`}>
       {/* Measure the entire available line, without the More control taking space.

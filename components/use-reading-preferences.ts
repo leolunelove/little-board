@@ -1,8 +1,16 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 
-type Preferences = { collapsed: boolean; expandedNotes: string[] };
-const defaults: Preferences = { collapsed: false, expandedNotes: [] };
+type Preferences = {
+  collapsed: boolean;
+  expandedNotes: string[];
+  view: "board" | "list";
+};
+const defaults: Preferences = {
+  collapsed: false,
+  expandedNotes: [],
+  view: "board",
+};
 
 export function useReadingPreferences(boardId: string, demo: boolean) {
   const key = `memo:reading:v1:${demo ? "preview:" : ""}${boardId}`;
@@ -16,6 +24,7 @@ export function useReadingPreferences(boardId: string, demo: boolean) {
       if (saved && typeof saved === "object") {
         next = {
           collapsed: saved.collapsed === true,
+          view: saved.view === "list" ? "list" : "board",
           expandedNotes: Array.isArray(saved.expandedNotes)
             ? saved.expandedNotes
                 .filter(
@@ -46,6 +55,9 @@ export function useReadingPreferences(boardId: string, demo: boolean) {
 
   return {
     ...preferences,
+    setView(view: "board" | "list") {
+      remember({ ...current.current, view });
+    },
     toggleDone() {
       remember({ ...current.current, collapsed: !current.current.collapsed });
     },

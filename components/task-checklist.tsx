@@ -9,8 +9,10 @@ export function TaskChecklist({
   busy,
   onSave,
   initiallyOpen = false,
+  hideNote = false,
 }: {
   initiallyOpen?: boolean;
+  hideNote?: boolean;
   task: Task;
   writable: boolean;
   busy: boolean;
@@ -39,7 +41,7 @@ export function TaskChecklist({
               <span style={{ width: `${(completed / steps.length) * 100}%` }} />
             </span>
           </summary>
-          {task.note && (
+          {task.note && !hideNote && (
             <p className="task-note">
               <RedactedText>{task.note}</RedactedText>
             </p>
