@@ -2133,3 +2133,112 @@ label.checklist-step {
     display: none;
   }
 }
+
+/* One continuous reading view; the same rows and permissions in both layouts. */
+.view-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 24px;
+}
+.view-switch {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: 10px;
+  background: var(--field);
+}
+.view-switch button {
+  min-height: 36px;
+  padding: 6px 16px;
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.view-switch button[aria-pressed="true"] {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 1px 4px var(--shadow);
+}
+.copy-list {
+  font-size: 12px;
+  min-height: 40px;
+}
+.unified-list {
+  margin-bottom: 24px;
+}
+.list-row {
+  border-bottom: 1px solid var(--line);
+}
+.list-row:last-child {
+  border-bottom: 0;
+}
+.list-status {
+  color: var(--muted);
+  font-size: 11px;
+}
+.list-status-waiting {
+  color: var(--waiting);
+}
+.list-row .task-checklist {
+  margin-top: 6px;
+}
+.list-note {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+.list-note .text-button {
+  font-size: 12px;
+  min-height: 32px;
+  padding: 4px 0;
+}
+.list-note .task-note {
+  white-space: pre-wrap;
+}
+.copy-list-text {
+  width: 100%;
+  min-height: 260px;
+  max-height: 55vh;
+  resize: vertical;
+  background: var(--field);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px;
+  line-height: 1.6;
+  font: inherit;
+}
+@media (max-width: 600px) {
+  .view-switch button {
+    min-height: 44px;
+  }
+  .view-toolbar {
+    margin-bottom: 16px;
+  }
+  .list-row .row-tools {
+    margin-right: 0;
+  }
+}
+
+/* Review pass: keep the save marker with its text at narrow widths. */
+.header-meta .updated {
+  display: block;
+  min-width: 0;
+}
+.sync-dot {
+  display: inline-block;
+  vertical-align: middle;
+  margin-right: 7px;
+}
+.copy-list {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+@media (pointer: coarse) {
+  .list-note .text-button {
+    min-height: 44px;
+  }
+}
