@@ -2242,3 +2242,121 @@ label.checklist-step {
     min-height: 44px;
   }
 }
+
+/* A working list spanning boards, using the same task rows and editor. */
+.all-items-entry {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  text-align: left;
+  background: var(--field);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 18px 20px;
+  margin: 16px 0;
+  cursor: pointer;
+}
+.all-items-entry span:first-child {
+  display: grid;
+  gap: 5px;
+}
+.all-items-entry small {
+  color: var(--muted);
+  font-weight: 400;
+}
+.all-items-entry:hover {
+  border-color: var(--muted);
+}
+.all-items-filters {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 24px 0 30px;
+}
+.all-items-filters select,
+.add-destination select {
+  color: var(--ink);
+  background: var(--field);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+  min-height: 44px;
+  max-width: 100%;
+  font: inherit;
+}
+.all-items-filters > label {
+  max-width: 48%;
+}
+.all-items-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  flex: 1;
+  min-width: 0;
+}
+.all-items-search input {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+}
+.source-board-link {
+  display: block;
+  max-width: 100%;
+  text-align: left;
+  overflow-wrap: anywhere;
+  border: 0;
+  background: transparent;
+  padding: 4px 0;
+  margin-bottom: 4px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--muted);
+  cursor: pointer;
+}
+.source-board-link:hover {
+  color: var(--ink);
+}
+.add-destination {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 13px;
+  padding: 0 0 10px;
+}
+.add-destination select {
+  flex: 1;
+  min-width: 0;
+}
+.all-items-shell .memo-header {
+  margin-bottom: 0;
+}
+.all-items-shell .memo-footer {
+  flex-wrap: wrap;
+  gap: 12px;
+}
+@media (max-width: 600px) {
+  .all-items-filters {
+    gap: 10px;
+  }
+  .all-items-filters select {
+    font-size: 14px;
+  }
+  .source-board-link {
+    min-height: 36px;
+  }
+}
+.source-board-number {
+  opacity: 0.65;
+  margin-left: 4px;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
