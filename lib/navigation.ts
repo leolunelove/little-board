@@ -14,3 +14,11 @@ export function currentCode() {
     .replace(/^\/+|\/+$/g, "");
   return CODE.test(value) ? value : null;
 }
+
+export function isAllItems() {
+  return (
+    window.location.pathname
+      .slice(basePath.length)
+      .replace(/^\/+|\/+$/g, "") === "all"
+  );
+}
