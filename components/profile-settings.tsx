@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Settings2 } from "lucide-react";
 import { AppearanceControl } from "./appearance-control";
 import { iconKey } from "./board-icon";
@@ -7,6 +7,7 @@ import { Sheet } from "./sheet";
 export function ProfileSettings({ boardId }: { boardId?: string }) {
   const [error, setError] = useState("");
   const [notes, setNotes] = useState(false);
+  const svgInput = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -31,9 +32,18 @@ export function ProfileSettings({ boardId }: { boardId?: string }) {
           {boardId && (
             <>
               <h3>Board icon</h3>
-              <label className="text-button">
+              <button
+                type="button"
+                className="text-button"
+                onClick={() => svgInput.current?.click()}
+              >
                 Choose an SVG
+              </button>
+              <>
                 <input
+                  ref={svgInput}
+                  hidden
+                  aria-label="Choose SVG file"
                   type="file"
                   accept="image/svg+xml,.svg"
                   onChange={async (event) => {
@@ -74,7 +84,7 @@ export function ProfileSettings({ boardId }: { boardId?: string }) {
                     event.target.value = "";
                   }}
                 />
-              </label>
+              </>
               <button
                 className="text-button"
                 onClick={() => {
