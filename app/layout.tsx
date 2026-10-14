@@ -4,6 +4,7 @@ import { APPEARANCE_SCRIPT } from "@/lib/appearance";
 import "./globals.css";
 import "./surface.css";
 import "./little-board.css";
+import { openingRouteScript } from "@/lib/opening-route";
 import { basePath } from "@/lib/navigation";
 export const metadata: Metadata = {
   title: "Little Board",
@@ -37,8 +38,17 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           }
         />
         <script dangerouslySetInnerHTML={{ __html: APPEARANCE_SCRIPT }} />
+        <script
+          dangerouslySetInnerHTML={{ __html: openingRouteScript(basePath) }}
+        />
       </head>
       <body>
+        <div className="route-opening" aria-hidden="true">
+          <span className="little-brand">
+            little <strong>board.</strong>
+          </span>
+          <p>Opening…</p>
+        </div>
         <PwaRuntime />
         {children}
       </body>

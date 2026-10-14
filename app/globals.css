@@ -2799,3 +2799,87 @@ html[data-theme="light"] .add-area {
     padding-block: 8px;
   }
 }
+
+/* Keep tools secondary and the finish action in a predictable place. */
+.editor-options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px 12px;
+  flex: 1;
+  min-width: 0;
+}
+.editor-commands {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-left: auto;
+}
+.row-menu {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+@media (max-width: 600px) {
+  .editor-options {
+    flex-basis: 100%;
+    gap: 4px 12px;
+  }
+  .editor-commands {
+    width: 100%;
+    justify-content: flex-end;
+  }
+  .editor-commands > button {
+    min-height: 44px;
+  }
+  .task-row.editing .editor-bottom {
+    gap: 0;
+    padding: 4px 8px;
+  }
+  .quick-add .editor-bottom {
+    gap: 0;
+  }
+}
+.route-opening {
+  display: none;
+}
+html[data-route-loading] .little-home {
+  display: none;
+}
+html[data-route-loading] .route-opening {
+  display: block;
+  max-width: 700px;
+  margin: 48px auto;
+  padding: 24px;
+}
+.route-opening p {
+  color: var(--muted);
+  font-size: 14px;
+  margin-top: 48px;
+}
+.row-tools.menu-open {
+  z-index: 80;
+  opacity: 1;
+}
+.editor-commands {
+  margin-top: 8px;
+}
+.editor-commands .text-button {
+  min-height: 44px;
+}
+@media (max-width: 600px) {
+  .task-row.editing .editor-bottom {
+    position: static;
+    padding: 0;
+  }
+  .task-row.editing .editor-commands {
+    position: sticky;
+    bottom: calc(
+      12px + env(safe-area-inset-bottom) + var(--keyboard-inset, 0px)
+    );
+    background: var(--field);
+    padding: 4px 8px;
+    border-radius: 10px;
+    z-index: 3;
+  }
+}
