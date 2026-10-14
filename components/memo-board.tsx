@@ -1,4 +1,5 @@
 "use client";
+import { SaveStatus } from "./save-status";
 import { BoardIcon } from "./board-icon";
 import { TaskImages } from "./task-images";
 import { transport } from "@/lib/transport";
@@ -278,10 +279,14 @@ export function MemoBoard({
     };
     const timer = setInterval(refresh, 8000);
     window.addEventListener("focus", refresh);
+    window.addEventListener("online", refresh);
+    window.addEventListener("little-board:sync", refresh);
     return () => {
       stopped = true;
       clearInterval(timer);
       window.removeEventListener("focus", refresh);
+      window.removeEventListener("online", refresh);
+      window.removeEventListener("little-board:sync", refresh);
     };
   }, [
     demo,
@@ -829,29 +834,15 @@ export function MemoBoard({
             role="status"
             suppressHydrationWarning
           >
-            {busy ? (
-              "Saving…"
-            ) : error && writable ? (
-              "Not saved · please retry"
-            ) : !fresh ? (
-              "Offline · reconnecting…"
+            {initial.code && !demo ? (
+              <SaveStatus
+                board={board}
+                busy={busy}
+                error={writable ? error : ""}
+                fresh={fresh}
+              />
             ) : (
-              <>
-                <span className="sync-dot" />
-                {writable && !demo
-                  ? initial.code && !board.claimed
-                    ? "Saved on this device · "
-                    : "Saved · "
-                  : ""}
-                {writable && !demo ? "" : "Updated "}
-                {sameDay
-                  ? ""
-                  : date.toLocaleDateString([], {
-                      month: "short",
-                      day: "numeric",
-                    }) + " at "}
-                {time}
-              </>
+              <>Updated {time}</>
             )}
           </div>
           <div className="header-controls">
@@ -1296,7 +1287,11 @@ export function MemoBoard({
               : writable
                 ? initial.code && !board.claimed
                   ? "Saved on this device."
-                  : "Only you can edit."
+                  : board.sync_state === "pending"
+                    ? "Changes saved here · waiting to sync."
+                    : board.sync_state === "conflict"
+                      ? "Keep a local copy in Settings to review changes."
+                      : "Saved to your email · only you can edit."
                 : "Updates automatically"}
           </span>
           <div className="footer-controls">

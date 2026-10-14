@@ -9,6 +9,7 @@ import {
   Link2,
 } from "lucide-react";
 import { ProfileSettings as AppearanceControl } from "./profile-settings";
+import { launchTarget, readLaunch, LAST_BOARD_KEY } from "@/lib/launch";
 import { BoardIcon } from "./board-icon";
 import { AllItems } from "./all-items";
 import { MemoBoard } from "./memo-board";
@@ -88,6 +89,9 @@ export function LittleBoardApp() {
         const loaded = await memoRequest(`/api/memos/${selected}`);
         if (version !== generation.current) return;
         setBoard(loaded);
+        try {
+          localStorage.setItem(LAST_BOARD_KEY, selected);
+        } catch {}
         setPartner(loaded.invited_email || "");
       } else setBoard(null);
     } catch (e) {
@@ -116,9 +120,10 @@ export function LittleBoardApp() {
       );
     // Supabase owns the code exchange. Wait for its session before cleaning the callback URL.
     async function bootstrap() {
-      const result = emailEnabled
-        ? await cloudClient().auth.getSession()
-        : null;
+      const result =
+        emailEnabled && navigator.onLine !== false
+          ? await cloudClient().auth.getSession()
+          : null;
       const signedIn = result?.data.session;
       const failedCallback = Boolean(
         authError ||
@@ -126,7 +131,25 @@ export function LittleBoardApp() {
         (emailEnabled && query.has("code") && !signedIn),
       );
       if (restored) window.history.replaceState(null, "", boardUrl(restored));
-      else if (query.has("welcome") || query.has("code") || authError)
+      else if (
+        !currentCode() &&
+        !isAllItems() &&
+        !query.has("code") &&
+        !query.has("welcome") &&
+        !authError &&
+        (query.has("launch") ||
+          window.matchMedia?.("(display-mode: standalone)").matches)
+      ) {
+        let last;
+        try {
+          last = localStorage.getItem(LAST_BOARD_KEY);
+        } catch {}
+        window.history.replaceState(
+          null,
+          "",
+          boardUrl(launchTarget(readLaunch(), last)),
+        );
+      } else if (query.has("welcome") || query.has("code") || authError)
         window.history.replaceState(null, "", boardUrl());
       await load();
       if (returned && restored && signedIn && !failedCallback) {

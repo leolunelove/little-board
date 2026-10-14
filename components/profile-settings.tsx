@@ -3,6 +3,7 @@ import { useState, useRef } from "react";
 import { Settings2 } from "lucide-react";
 import { AppearanceControl } from "./appearance-control";
 import { iconKey } from "./board-icon";
+import { AppTools } from "./app-tools";
 import { Sheet } from "./sheet";
 export function ProfileSettings({ boardId }: { boardId?: string }) {
   const [error, setError] = useState("");
@@ -29,6 +30,7 @@ export function ProfileSettings({ boardId }: { boardId?: string }) {
           <p className="attachment-hint">
             Your choice is remembered on this device.
           </p>
+          <AppTools boardId={boardId} />
           {boardId && (
             <>
               <h3>Board icon</h3>
@@ -109,6 +111,18 @@ export function ProfileSettings({ boardId }: { boardId?: string }) {
           </button>
           {notes && (
             <div className="release-notes">
+              <h3>Installable app update · 14 October 2026</h3>
+              <ul>
+                <li>Install Little Board and choose its opening page.</li>
+                <li>Download and restore board backups, including images.</li>
+                <li>
+                  Previously opened boards work offline. Device edits sync when
+                  connected, with conflict recovery.
+                </li>
+                <li>
+                  Clearer save states and more comfortable mobile controls.
+                </li>
+              </ul>
               <h3>14 October 2026</h3>
               <ul>
                 <li>

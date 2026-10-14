@@ -19,6 +19,12 @@ export function combineBoards(boards: Board[]): Board {
   return {
     id: "all-items",
     title: "All items",
+    sync_state: boards.some((b) => b.sync_state === "conflict")
+      ? "conflict"
+      : boards.some((b) => b.sync_state === "pending")
+        ? "pending"
+        : "synced",
+    offline: boards.some((b) => b.offline),
     updated_at:
       boards
         .map((b) => b.updated_at)
@@ -205,6 +211,7 @@ export function AllItems({
     };
     window.addEventListener("focus", visible);
     window.addEventListener("online", visible);
+    window.addEventListener("little-board:sync", visible);
     document.addEventListener("visibilitychange", visible);
     window.addEventListener("storage", storage);
     return () => {
@@ -213,6 +220,7 @@ export function AllItems({
       clearInterval(tick);
       window.removeEventListener("focus", visible);
       window.removeEventListener("online", visible);
+      window.removeEventListener("little-board:sync", visible);
       document.removeEventListener("visibilitychange", visible);
       window.removeEventListener("storage", storage);
     };
@@ -310,7 +318,13 @@ export function AllItems({
               ? "Not saved · please retry"
               : refreshError
                 ? refreshError
-                : "Across your boards · updates automatically"}
+                : board.sync_state === "conflict"
+                  ? "Device changes need review in Settings"
+                  : board.sync_state === "pending"
+                    ? "Saved on device · waiting to sync"
+                    : board.offline
+                      ? "Offline · showing device copies"
+                      : "Across your boards · updates automatically"}
         </p>
       </header>
       <div className="all-items-filters">
