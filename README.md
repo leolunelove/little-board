@@ -22,6 +22,8 @@
 - **Keep moving.** Quick add stays within reach. Undo a completion or removal. Finished items move to Archived after 24 hours.
 - **Make it comfortable.** Choose light or night mode, expand notes when you need them, and use the same board on a phone or desktop.
 
+- **Keep it nearby.** Install Little Board from Settings, choose where it opens, work offline on previously opened boards, and download or restore a board backup.
+
 ## Get started
 
 1. [Open Little Board](https://littleboard.cc/) and choose **Create board**.
