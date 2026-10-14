@@ -1,3 +1,4 @@
+import { parseBackup, makeBackup } from "./board-backup";
 import { BOARD_IMAGE_LIMIT } from "./task-images";
 import type { Board, Task } from "./types";
 import { taskCommand } from "./task-command";
@@ -155,6 +156,29 @@ export function localBoards(storage: () => StorageLike) {
       boards[index] = applyCommand(boards[index], command);
       write(boards);
       return boards[index];
+    },
+    restore(raw: unknown) {
+      const imported = parseBackup(raw);
+      const boards = all();
+      if (boards.length >= 100)
+        throw new HttpError(400, "You have 100 boards saved on this device.");
+      let code = randomCode();
+      while (boards.some((b) => b.code === code)) code = randomCode();
+      const id = crypto.randomUUID();
+      const board: Board = {
+        ...imported,
+        id,
+        code,
+        access: "owner",
+        claimed: false,
+        updated_at: new Date().toISOString(),
+        tasks: imported.tasks.map((task) => ({ ...task, board_id: id })),
+      };
+      write([board, ...boards]);
+      return board;
+    },
+    copy(board: Board) {
+      return this.restore(makeBackup(board));
     },
     remove(code: string) {
       write(all().filter((b) => b.code !== code));

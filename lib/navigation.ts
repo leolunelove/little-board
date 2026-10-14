@@ -4,6 +4,10 @@ export function boardUrl(code?: string) {
   return `${basePath}/${code || ""}`;
 }
 export function navigate(code?: string) {
+  if (code && CODE.test(code))
+    try {
+      localStorage.setItem("little-board:last-board", code);
+    } catch {}
   window.history.pushState(null, "", boardUrl(code));
   window.dispatchEvent(new PopStateEvent("popstate"));
   window.scrollTo?.(0, 0);

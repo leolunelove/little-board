@@ -19,6 +19,15 @@ export function cloudClient() {
       "Email sign-in isn’t available yet. You can still create a board.",
     );
   client ||= createClient(url!, key!, {
+    global: {
+      fetch: (input, init = {}) =>
+        fetch(input, {
+          ...init,
+          signal: init.signal
+            ? AbortSignal.any([init.signal, AbortSignal.timeout(8000)])
+            : AbortSignal.timeout(8000),
+        }),
+    },
     auth: {
       flowType: "pkce",
       persistSession: true,
@@ -51,6 +60,15 @@ export async function account() {
   } = await cloudClient().auth.getSession();
   if (!session) return null;
   const { data, error } = await cloudClient().auth.getUser();
+  if (
+    error &&
+    ((error.status && error.status >= 500) ||
+      error.name === "AuthRetryableFetchError")
+  )
+    throw new HttpError(
+      503,
+      "Couldn’t connect. Your device copy is available.",
+    );
   if (error || !data.user?.email_confirmed_at)
     throw new HttpError(401, "Sign in with your email to open saved boards.");
   return data.user;
@@ -83,6 +101,7 @@ function dbError(error: { code?: string } | null) {
 function payload(row: Record<string, any>, uid: string): Board {
   return {
     id: row.id,
+    server_revision: Number(row.revision),
     code: row.code,
     title: row.title,
     description: row.description || "",
@@ -257,4 +276,29 @@ export async function shareBoard(code: string, email: string | null) {
     board: payload(data, data.owner_id),
     url: new URL(boardUrl(code), window.location.origin).href,
   };
+}
+
+// Conditional whole-board save for durable offline edits. RLS remains authoritative.
+export async function cloudReplace(board: Board, revision: number) {
+  const user = await account();
+  if (!user) throw new HttpError(401, "Sign in to sync your saved changes.");
+  const { data, error } = await cloudClient()
+    .from("little_boards")
+    .update({
+      title: board.title,
+      description: board.description || "",
+      tasks: board.tasks,
+      revision: revision + 1,
+    })
+    .eq("id", board.id)
+    .eq("revision", revision)
+    .select()
+    .maybeSingle();
+  dbError(error);
+  if (!data)
+    throw new HttpError(
+      409,
+      "This board changed elsewhere. Your edits are still saved on this device.",
+    );
+  return { board: payload(data, user.id), revision: Number(data.revision) };
 }

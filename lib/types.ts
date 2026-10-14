@@ -17,6 +17,9 @@ export type Task = {
   completed_at: string | null;
 };
 export type Board = {
+  server_revision?: number;
+  sync_state?: "synced" | "pending" | "conflict";
+  offline?: boolean;
   description?: string;
   code?: string;
   access?: "owner" | "viewer";
