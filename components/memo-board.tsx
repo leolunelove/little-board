@@ -1,4 +1,6 @@
 "use client";
+import { CSS } from "@dnd-kit/utilities";
+import { useBoardPosition } from "./use-board-position";
 import { SaveStatus } from "./save-status";
 import { BoardIcon } from "./board-icon";
 import { TaskImages } from "./task-images";
@@ -118,6 +120,7 @@ export function MemoBoard({
     settleUndo,
   } = useMemoMutations(initial, demo);
   const writable = mode !== "viewer";
+  useBoardPosition(initial.id, !embedded && !demo);
   const [query, setQuery] = useState("");
   const [copyFallback, setCopyFallback] = useState<string | null>(null);
   const [copyBusy, setCopyBusy] = useState(false);
@@ -337,6 +340,8 @@ export function MemoBoard({
       if (patch.status && patch.status !== task.status)
         setNotice(`Moved to ${labels[patch.status]}`);
       if (fromEditor) {
+        if (!patch.status || patch.status === task.status)
+          setNotice("Item saved");
         rememberDraft(task.id, null);
         setEditing((current) => (current === task.id ? null : current));
       }
@@ -630,7 +635,11 @@ export function MemoBoard({
                     : status === "pending"
                       ? activeId
                         ? "Drop here"
-                        : "Nothing pending. A little breathing room."
+                        : board.tasks.length
+                          ? "All caught up. Nothing pending."
+                          : writable
+                            ? "A fresh board. Add your first item below."
+                            : "Nothing on this board yet."
                       : status === "waiting"
                         ? activeId
                           ? "Drop here"
@@ -1021,6 +1030,14 @@ export function MemoBoard({
             </>
           )}
         </div>
+      )}
+      {(board.offline || !fresh) && (
+        <p className="connection-note" role="status">
+          Showing the last saved copy.{" "}
+          {writable
+            ? "Your edits stay on this device until the app reconnects."
+            : "Reconnect to see the latest updates."}
+        </p>
       )}
       {error && (
         <div className="error-banner" role="alert">
@@ -1448,12 +1465,19 @@ export function TaskRow({
   onDelete: () => void;
   onMove: (offset: number) => void;
 }) {
-  const { attributes, listeners, setNodeRef, setActivatorNodeRef, isDragging } =
-    useSortable({
-      id: task.id,
-      data: { kind: "task", status: task.status },
-      disabled: !writable || dragDisabled || editing,
-    });
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    setActivatorNodeRef,
+    isDragging,
+    transform,
+    transition,
+  } = useSortable({
+    id: task.id,
+    data: { kind: "task", status: task.status },
+    disabled: !writable || dragDisabled || editing,
+  });
   const rowRef = useRef<HTMLDivElement | null>(null);
   const previousTop = useRef<number | null>(null);
   const movement = useRef<Animation | null>(null);
@@ -1495,6 +1519,13 @@ export function TaskRow({
       ref={(node) => {
         rowRef.current = node;
         setNodeRef(node);
+      }}
+      style={{
+        transform:
+          dragActive && !isDragging
+            ? CSS.Transform.toString(transform)
+            : undefined,
+        transition: reducedMotion ? "none" : transition,
       }}
       data-task-id={task.id}
       className={`task-row ${task.status} ${isDragging ? "dragging" : ""} ${editing ? "editing" : ""}${dropBefore ? " drop-before" : ""}${list ? " list-row" : task.checklist?.length ? " task-card" : ""}`}

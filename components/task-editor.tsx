@@ -1,7 +1,8 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ChevronDown, Plus, X, ImagePlus, ListChecks } from "lucide-react";
 import { compressImage, MAX_IMAGES } from "@/lib/task-images";
+import { useComposerDock } from "./use-composer-dock";
 import { TaskImages } from "./task-images";
 import type { Task, Status, TaskImage } from "@/lib/types";
 
@@ -26,6 +27,10 @@ export function TaskEditor({
   onCancel: () => void;
   onDirtyChange?: (dirty: boolean) => void;
 }) {
+  const { dockRef: actionsRef, style: actionStyle } = useComposerDock(
+    Boolean(task),
+    Boolean(task),
+  );
   const [title, setTitle] = useState(draft?.title ?? task?.title ?? "");
   const [note, setNote] = useState(draft?.note ?? task?.note ?? "");
   const [status, setStatus] = useState<Status>(
@@ -54,7 +59,19 @@ export function TaskEditor({
     return () => element?.removeEventListener("cancel", closePicker);
   }, []);
   const originalRequest = draft?.original_request ?? task?.original_request;
-  const [details, setDetails] = useState(false);
+  const [details, setDetails] = useState(
+    Boolean(
+      task && (note || checklist.length || assigned || status !== "pending"),
+    ),
+  );
+  const noteInput = useRef<HTMLTextAreaElement>(null);
+  useLayoutEffect(() => {
+    const element = noteInput.current;
+    if (element) {
+      element.style.height = "auto";
+      element.style.height = `${Math.min(180, Math.max(64, element.scrollHeight))}px`;
+    }
+  }, [note, details]);
   const [saving, setSaving] = useState(false);
   const [failed, setFailed] = useState(false);
   const id = useRef(task?.id || draftId || crypto.randomUUID());
@@ -164,6 +181,7 @@ export function TaskEditor({
     <form
       className={`task-editor${task ? "" : " quick-add"}${details ? " details-open" : ""}`}
       aria-label={task ? "Edit item" : "Add item"}
+      aria-busy={saving || processing}
       onPaste={(event) => {
         const files = Array.from(event.clipboardData.files).filter((file) =>
           file.type.startsWith("image/"),
@@ -337,10 +355,11 @@ export function TaskEditor({
       )}
       {details && (
         <div className="editor-details">
-          <label className="sr-only" htmlFor={`note-${id.current}`}>
+          <label className="editor-label" htmlFor={`note-${id.current}`}>
             Short note
           </label>
           <textarea
+            ref={noteInput}
             id={`note-${id.current}`}
             aria-label="Short note"
             placeholder="Add a short note… or paste an image"
@@ -438,12 +457,15 @@ export function TaskEditor({
           </div>
         </div>
       )}
+      {task && changed && !saving && !failed && (
+        <p className="editor-save-hint">Unsaved changes · Enter to save</p>
+      )}
       {failed && (
         <p className="draft-error" role="alert">
           Couldn’t save. Your text is still here—try again.
         </p>
       )}
-      <div className="editor-bottom">
+      <div className="editor-bottom" ref={actionsRef} style={actionStyle}>
         <button
           type="button"
           className="text-button"

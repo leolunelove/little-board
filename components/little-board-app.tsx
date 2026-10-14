@@ -245,7 +245,7 @@ export function LittleBoardApp() {
     return (
       <main className="little-opening">
         {brand}
-        <p role="status">Opening all items…</p>
+        <BoardSkeleton label="Opening all items…" />
       </main>
     );
   if (allItems)
@@ -260,7 +260,7 @@ export function LittleBoardApp() {
     return (
       <main className="little-opening">
         {brand}
-        <p role="status">Opening your board…</p>
+        <BoardSkeleton label="Opening your board…" />
       </main>
     );
   if (code && board)
@@ -759,5 +759,25 @@ export function LittleBoardApp() {
         )}
       </footer>
     </main>
+  );
+}
+
+function BoardSkeleton({ label }: { label: string }) {
+  return (
+    <div className="board-skeleton" role="status" aria-label={label}>
+      <span className="sr-only">{label}</span>
+      <div aria-hidden="true">
+        <i className="skeleton-title" />
+        <i className="skeleton-subtitle" />
+        <div className="skeleton-rows">
+          {[0, 1, 2].map((row) => (
+            <div key={row}>
+              <i />
+              <i />
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }

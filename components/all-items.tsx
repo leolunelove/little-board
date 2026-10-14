@@ -281,6 +281,8 @@ export function AllItems({
           )
         : await change("update", { id: task.id, patch }, transform, fromEditor);
     if (ok && fromEditor) {
+      if (!patch.status || patch.status === task.status)
+        setNotice("Item saved");
       rememberDraft(task.id, null);
       setEditing(null);
     }

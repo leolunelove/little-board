@@ -111,6 +111,19 @@ export function ProfileSettings({ boardId }: { boardId?: string }) {
           </button>
           {notes && (
             <div className="release-notes">
+              <h3>A little more care · 14 October 2026</h3>
+              <ul>
+                <li>
+                  Existing notes and checklists open directly in the editor.
+                </li>
+                <li>Smoother drag spacing and clearer save feedback.</li>
+                <li>Return to your reading position on each board.</li>
+                <li>
+                  Browse image references with arrows or swipe; swipe down to
+                  close.
+                </li>
+                <li>Quieter loading, empty and offline states.</li>
+              </ul>
               <h3>Installable app update · 14 October 2026</h3>
               <ul>
                 <li>Install Little Board and choose its opening page.</li>

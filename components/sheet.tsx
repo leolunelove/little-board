@@ -1,14 +1,16 @@
 "use client";
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode, type KeyboardEvent } from "react";
 import { X } from "lucide-react";
 export function Sheet({
   title,
   children,
   onClose,
+  onKeyDown,
 }: {
   title: string;
   children: ReactNode;
   onClose: () => void;
+  onKeyDown?: (event: KeyboardEvent<HTMLDialogElement>) => void;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const close = useRef(onClose);
@@ -34,6 +36,7 @@ export function Sheet({
       aria-label={title}
       onKeyDown={(event) => {
         if (event.key === "Escape") event.stopPropagation();
+        onKeyDown?.(event);
       }}
       onCancel={(event) => {
         event.preventDefault();
@@ -54,7 +57,12 @@ export function Sheet({
     >
       <div className="sheet-heading">
         <h2>{title}</h2>
-        <button className="icon-button" aria-label="Close" onClick={onClose}>
+        <button
+          type="button"
+          className="icon-button"
+          aria-label="Close"
+          onClick={onClose}
+        >
           <X size={20} />
         </button>
       </div>
