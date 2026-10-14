@@ -118,7 +118,8 @@ test("quick add retains failed drafts and their UUID, then resets and focuses fo
     name: "Item title",
   }) as HTMLInputElement;
   ui.fireEvent.change(input, { target: { value: "New item" } });
-  ui.fireEvent.click(ui.screen.getByRole("button", { name: "Add details" }));
+  if (ui.screen.queryByRole("button", { name: "Add details" }))
+    ui.fireEvent.click(ui.screen.getByRole("button", { name: "Add details" }));
   ui.fireEvent.change(ui.screen.getByRole("textbox", { name: "Short note" }), {
     target: { value: "Keep this draft" },
   });
@@ -274,7 +275,8 @@ test("failed inline saves across sections preserve the editor, note, and selecte
   ui.fireEvent.change(ui.screen.getByRole("textbox", { name: "Item title" }), {
     target: { value: "Revised title" },
   });
-  ui.fireEvent.click(ui.screen.getByRole("button", { name: "Add details" }));
+  if (ui.screen.queryByRole("button", { name: "Add details" }))
+    ui.fireEvent.click(ui.screen.getByRole("button", { name: "Add details" }));
   ui.fireEvent.change(ui.screen.getByRole("textbox", { name: "Short note" }), {
     target: { value: "Revised note" },
   });
@@ -724,7 +726,8 @@ test("switching tasks keeps an unsaved edit and Cancel deliberately discards it"
   ui.fireEvent.change(ui.screen.getByRole("textbox", { name: "Item title" }), {
     target: { value: "Unfinished wording" },
   });
-  ui.fireEvent.click(ui.screen.getByRole("button", { name: "Add details" }));
+  if (ui.screen.queryByRole("button", { name: "Add details" }))
+    ui.fireEvent.click(ui.screen.getByRole("button", { name: "Add details" }));
   ui.fireEvent.change(ui.screen.getByRole("textbox", { name: "Short note" }), {
     target: { value: "Keep this detail" },
   });
@@ -740,7 +743,8 @@ test("switching tasks keeps an unsaved edit and Cancel deliberately discards it"
       .value,
     "Unfinished wording",
   );
-  ui.fireEvent.click(ui.screen.getByRole("button", { name: "Add details" }));
+  if (ui.screen.queryByRole("button", { name: "Add details" }))
+    ui.fireEvent.click(ui.screen.getByRole("button", { name: "Add details" }));
   assert.equal(
     (
       ui.screen.getByRole("textbox", {
@@ -783,10 +787,17 @@ test("inline title saves on leaving the form, ignores internal focus, and Escape
     }),
   );
   const input = ui.screen.getByRole("textbox", { name: "Item title" });
-  assert.equal(ui.screen.queryByRole("textbox", { name: "Short note" }), null);
+  assert.equal(
+    (
+      ui.screen.getByRole("textbox", {
+        name: "Short note",
+      }) as HTMLTextAreaElement
+    ).value,
+    task.note,
+  );
   ui.fireEvent.change(input, { target: { value: "Edited inline" } });
   ui.fireEvent.blur(input, {
-    relatedTarget: ui.screen.getByRole("button", { name: "Add details" }),
+    relatedTarget: ui.screen.getByRole("button", { name: "Less detail" }),
   });
   assert.equal(saves.length, 0);
   await ui.act(async () => {
@@ -1135,7 +1146,8 @@ test("Enter inserts the next checklist step and saving drops blank steps", async
       },
     }),
   );
-  ui.fireEvent.click(ui.screen.getByRole("button", { name: "Add details" }));
+  if (ui.screen.queryByRole("button", { name: "Add details" }))
+    ui.fireEvent.click(ui.screen.getByRole("button", { name: "Add details" }));
   ui.fireEvent.click(
     ui.screen.getByRole("button", { name: "Add a checklist" }),
   );
@@ -1668,11 +1680,172 @@ test("closing an image preview with Escape keeps the unfinished item edit", () =
   );
   const dialog = ui.screen.getByRole("dialog", { name: "Reference" });
   ui.fireEvent.keyDown(dialog, { key: "Escape" });
-  ui.fireEvent(dialog, new window.Event("cancel", {cancelable:true}));
+  ui.fireEvent(dialog, new window.Event("cancel", { cancelable: true }));
   assert.equal(cancelled, 0);
   assert.equal(
     (ui.screen.getByRole("textbox", { name: "Item title" }) as HTMLInputElement)
       .value,
     "Unfinished title",
+  );
+});
+
+test("existing item details open immediately while a plain item stays compact", () => {
+  const view = ui.render(
+    createElement(TaskEditor, {
+      task,
+      onCancel() {},
+      onSave: async () => true,
+    }),
+  );
+  assert.equal(
+    (
+      ui.screen.getByRole("textbox", {
+        name: "Short note",
+      }) as HTMLTextAreaElement
+    ).value,
+    task.note,
+  );
+  assert.equal(
+    ui.screen
+      .getByRole("button", { name: "Less detail" })
+      .getAttribute("aria-expanded"),
+    "true",
+  );
+  ui.fireEvent.change(ui.screen.getByRole("textbox", { name: "Item title" }), {
+    target: { value: "A better title" },
+  });
+  assert.ok(ui.screen.getByText("Unsaved changes · Enter to save"));
+  view.unmount();
+  ui.render(
+    createElement(TaskEditor, {
+      task: { ...task, note: "" },
+      onCancel() {},
+      onSave: async () => true,
+    }),
+  );
+  assert.equal(ui.screen.queryByRole("textbox", { name: "Short note" }), null);
+});
+
+test("image navigation and touch dismissal preserve the unfinished editor", () => {
+  const images = ["Front", "Back"].map((name) => ({
+    id: crypto.randomUUID(),
+    name,
+    src: "data:image/webp;base64,UklGRg==",
+  }));
+  ui.render(
+    createElement(TaskEditor, {
+      task: { ...task, images },
+      onCancel() {},
+      onSave: async () => true,
+    }),
+  );
+  ui.fireEvent.change(ui.screen.getByRole("textbox", { name: "Item title" }), {
+    target: { value: "Unfinished changes" },
+  });
+  ui.fireEvent.click(
+    ui.screen.getByRole("button", { name: "Open image: Front" }),
+  );
+  ui.fireEvent.click(ui.screen.getByRole("button", { name: "Next image" }));
+  assert.ok(ui.screen.getByRole("dialog", { name: "Back" }));
+  ui.fireEvent.keyDown(ui.screen.getByRole("dialog", { name: "Back" }), {
+    key: "ArrowLeft",
+  });
+  assert.ok(ui.screen.getByRole("dialog", { name: "Front" }));
+  const stage = document.querySelector(".image-stage")!;
+  const down = new window.Event("pointerdown", { bubbles: true });
+  Object.assign(down, { pointerType: "touch", clientX: 100, clientY: 100 });
+  const up = new window.Event("pointerup", { bubbles: true });
+  Object.assign(up, { pointerType: "touch", clientX: 102, clientY: 220 });
+  ui.fireEvent(stage, down);
+  ui.fireEvent(stage, up);
+  assert.equal(ui.screen.queryByRole("dialog"), null);
+  assert.equal(
+    (ui.screen.getByRole("textbox", { name: "Item title" }) as HTMLInputElement)
+      .value,
+    "Unfinished changes",
+  );
+});
+
+test("reading position survives navigation resetting scroll and restores per board", async () => {
+  const { useBoardPosition } = await import("../components/use-board-position");
+  const oldRaf = window.requestAnimationFrame,
+    oldCancel = window.cancelAnimationFrame,
+    oldScroll = window.scrollTo;
+  const jobs = new Map<number, FrameRequestCallback>();
+  let seq = 0;
+  window.requestAnimationFrame = (fn) => {
+    jobs.set(++seq, fn);
+    return seq;
+  };
+  window.cancelAnimationFrame = (id) => {
+    jobs.delete(id);
+  };
+  const flush = () => {
+    while (jobs.size) {
+      const batch = [...jobs.values()];
+      jobs.clear();
+      for (const fn of batch) fn(0);
+    }
+  };
+  let restored = 0;
+  window.scrollTo = ((value: ScrollToOptions) => {
+    restored = value.top || 0;
+  }) as typeof window.scrollTo;
+  try {
+    const first = ui.renderHook(() => useBoardPosition("reading-test"));
+    ui.act(flush);
+    Object.defineProperty(window, "scrollY", {
+      configurable: true,
+      value: 740,
+    });
+    ui.fireEvent.scroll(window);
+    ui.act(flush);
+    ui.fireEvent.popState(window);
+    Object.defineProperty(window, "scrollY", { configurable: true, value: 0 });
+    first.unmount();
+    assert.equal(sessionStorage.getItem("memo:position:reading-test"), "740");
+    const second = ui.renderHook(() => useBoardPosition("reading-test"));
+    ui.act(flush);
+    assert.equal(restored, 740);
+    second.unmount();
+  } finally {
+    window.requestAnimationFrame = oldRaf;
+    window.cancelAnimationFrame = oldCancel;
+    window.scrollTo = oldScroll;
+    Object.defineProperty(window, "scrollY", { configurable: true, value: 0 });
+  }
+});
+
+test("closing an image with its button never submits the surrounding item form", () => {
+  let saves = 0;
+  const image = {
+    id: crypto.randomUUID(),
+    name: "Reference",
+    src: "data:image/webp;base64,UklGRg==",
+  };
+  ui.render(
+    createElement(TaskEditor, {
+      task: { ...task, images: [image] },
+      onCancel() {},
+      onSave: async () => {
+        saves++;
+        return true;
+      },
+    }),
+  );
+  ui.fireEvent.change(ui.screen.getByRole("textbox", { name: "Item title" }), {
+    target: { value: "Keep this draft" },
+  });
+  ui.fireEvent.click(
+    ui.screen.getByRole("button", { name: "Open image: Reference" }),
+  );
+  const close = ui.screen.getByRole("button", { name: "Close" });
+  assert.equal(close.getAttribute("type"), "button");
+  ui.fireEvent.click(close);
+  assert.equal(saves, 0);
+  assert.equal(
+    (ui.screen.getByRole("textbox", { name: "Item title" }) as HTMLInputElement)
+      .value,
+    "Keep this draft",
   );
 });
