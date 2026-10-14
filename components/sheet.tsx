@@ -32,6 +32,9 @@ export function Sheet({
       ref={ref}
       className="memo-sheet"
       aria-label={title}
+      onKeyDown={(event) => {
+        if (event.key === "Escape") event.stopPropagation();
+      }}
       onCancel={(event) => {
         event.preventDefault();
         close.current();
