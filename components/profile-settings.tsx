@@ -111,6 +111,14 @@ export function ProfileSettings({ boardId }: { boardId?: string }) {
           </button>
           {notes && (
             <div className="release-notes">
+              <h3>Small-screen refinements · 14 October 2026</h3>
+              <ul>
+                <li>Item menus stay within reach on short screens.</li>
+                <li>Editing tools and Save have clearer spacing on phones.</li>
+                <li>Close unchanged items with Done editing.</li>
+                <li>Completed lists show a clearer empty state.</li>
+                <li>Board links open without briefly flashing the homepage.</li>
+              </ul>
               <h3>A little more care · 14 October 2026</h3>
               <ul>
                 <li>

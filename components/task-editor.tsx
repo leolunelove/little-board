@@ -465,45 +465,49 @@ export function TaskEditor({
           Couldn’t save. Your text is still here—try again.
         </p>
       )}
-      <div className="editor-bottom" ref={actionsRef} style={actionStyle}>
-        <button
-          type="button"
-          className="text-button"
-          aria-expanded={details}
-          disabled={locked}
-          onClick={() => setDetails(!details)}
-        >
-          <ChevronDown size={13} />
-          {details ? "Less detail" : "Add details"}
-        </button>
-        {!checklist.length && (
+      <div className="editor-bottom">
+        <div className="editor-options">
           <button
             type="button"
             className="text-button"
+            aria-expanded={details}
             disabled={locked}
+            onClick={() => setDetails(!details)}
+          >
+            <ChevronDown size={13} />
+            {details ? "Less detail" : "Add details"}
+          </button>
+          {!checklist.length && (
+            <button
+              type="button"
+              className="text-button"
+              aria-label="Add a checklist"
+              disabled={locked}
+              onClick={() => {
+                setDetails(true);
+                appendStep();
+              }}
+            >
+              <ListChecks size={14} /> Checklist
+            </button>
+          )}
+          <button
+            type="button"
+            className="text-button"
+            disabled={locked || images.length >= MAX_IMAGES}
             onClick={() => {
-              setDetails(true);
-              appendStep();
+              pickerOpen.current = true;
+              imageInput.current?.click();
             }}
           >
-            <ListChecks size={14} /> Add a checklist
+            <ImagePlus size={14} /> Image
           </button>
-        )}
-        <button
-          type="button"
-          className="text-button"
-          disabled={locked || images.length >= MAX_IMAGES}
-          onClick={() => {
-            pickerOpen.current = true;
-            imageInput.current?.click();
-          }}
-        >
-          <ImagePlus size={14} /> Image
-        </button>
-        {!task && (
-          <span className="add-key-hint">Enter to add · Esc to finish</span>
-        )}
-        <span className="editor-spacer" />
+          {!task && (
+            <span className="add-key-hint">Enter to add · Esc to finish</span>
+          )}
+        </div>
+      </div>
+      <div className="editor-commands" ref={actionsRef} style={actionStyle}>
         <button
           type="button"
           className="text-button"
@@ -511,7 +515,13 @@ export function TaskEditor({
           onPointerDown={(event) => event.preventDefault()}
           onClick={cancel}
         >
-          {task || dirty ? "Cancel" : "Done adding"}
+          {task
+            ? changed || failed
+              ? "Cancel"
+              : "Done editing"
+            : dirty
+              ? "Cancel"
+              : "Done adding"}
         </button>
         {task && (
           <button

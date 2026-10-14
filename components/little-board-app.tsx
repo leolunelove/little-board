@@ -1,5 +1,11 @@
 "use client";
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import {
   ArrowRight,
   Plus,
@@ -55,6 +61,10 @@ export function LittleBoardApp() {
   const [code, setCode] = useState<string | null>(null),
     [board, setBoard] = useState<Board | null>(null),
     [boards, setBoards] = useState<Board[]>([]);
+  useLayoutEffect(() => {
+    if (code || allItems)
+      document.documentElement.removeAttribute("data-route-loading");
+  }, [code, allItems]);
   const [email, setEmail] = useState<string | null>(null),
     [ready, setReady] = useState(emailEnabled),
     [login, setLogin] = useState(false),

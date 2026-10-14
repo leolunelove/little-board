@@ -1,4 +1,5 @@
 "use client";
+import { useMenuPosition } from "./use-menu-position";
 import { CSS } from "@dnd-kit/utilities";
 import { useBoardPosition } from "./use-board-position";
 import { SaveStatus } from "./save-status";
@@ -582,9 +583,13 @@ export function MemoBoard({
             <p className="section-empty">
               {showArchive
                 ? "No archived items yet."
-                : writable
-                  ? "A fresh list. Add your first item below."
-                  : "Nothing on this board yet."}
+                : archived.length
+                  ? writable
+                    ? "All caught up. Completed items are in Archived."
+                    : "All caught up. Nothing to do here."
+                  : writable
+                    ? "A fresh list. Add your first item below."
+                    : "Nothing on this board yet."}
             </p>
           )}
         </section>
@@ -1500,9 +1505,25 @@ export function TaskRow({
     }
     previousTop.current = top;
   });
+  const wasEditing = useRef(editing);
+  useLayoutEffect(() => {
+    if (
+      wasEditing.current &&
+      !editing &&
+      (document.activeElement === document.body ||
+        rowRef.current?.contains(document.activeElement))
+    ) {
+      rowRef.current
+        ?.querySelector<HTMLButtonElement>(".task-title-button")
+        ?.focus({ preventScroll: true });
+    }
+    wasEditing.current = editing;
+  }, [editing]);
   const [menu, setMenu] = useState(false);
   const toolsRef = useRef<HTMLDivElement>(null);
   const menuButton = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  useMenuPosition(menu, menuButton, toolsRef, menuRef, () => setMenu(false));
   useEffect(() => {
     if (!menu) return;
     const close = (event: PointerEvent) => {
@@ -1624,7 +1645,7 @@ export function TaskRow({
           )}
           {writable && (
             <div
-              className="row-tools"
+              className={`row-tools${menu ? " menu-open" : ""}`}
               ref={toolsRef}
               onBlur={(event) => {
                 if (
@@ -1660,6 +1681,7 @@ export function TaskRow({
               {menu && (
                 <div
                   className="row-menu"
+                  ref={menuRef}
                   onKeyDown={(e) => {
                     if (e.key === "Escape") {
                       setMenu(false);
@@ -1716,7 +1738,14 @@ export function TaskRow({
                     <Trash2 size={15} />
                     Delete item
                   </button>
-                  <button onClick={() => setMenu(false)}>Close</button>
+                  <button
+                    onClick={() => {
+                      setMenu(false);
+                      menuButton.current?.focus({ preventScroll: true });
+                    }}
+                  >
+                    Close
+                  </button>
                 </div>
               )}
             </div>
