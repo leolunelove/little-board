@@ -1,3 +1,4 @@
+import { BOARD_IMAGE_LIMIT } from "./task-images";
 import type { Board, Task } from "./types";
 import { taskCommand } from "./task-command";
 import { HttpError, uuid } from "./security";
@@ -18,6 +19,7 @@ export function applyCommand(
   const command = taskCommand(input) as {
     action: string;
     title?: string;
+    description?: string;
     id?: string;
     task?: Task;
     tasks?: Task[];
@@ -25,6 +27,7 @@ export function applyCommand(
     items?: Pick<Task, "id" | "status" | "sort_order">[];
   };
   const next = structuredClone(board);
+  if (command.action === "describe") next.description = command.description!;
   if (command.action === "rename") next.title = command.title!;
   if (command.action === "add" || command.action === "add_many") {
     const additions = (
@@ -61,6 +64,20 @@ export function applyCommand(
       else if (previous !== "done") task.completed_at = now;
     }
   }
+  const imageBytes = next.tasks.reduce(
+    (total, task) =>
+      total +
+      (task.images || []).reduce(
+        (sum, image) => sum + image.src.length * 0.75,
+        0,
+      ),
+    0,
+  );
+  if (imageBytes > BOARD_IMAGE_LIMIT)
+    throw new HttpError(
+      400,
+      "This board has reached its image allowance. Remove an image before adding another.",
+    );
   next.updated_at = now;
   return next;
 }

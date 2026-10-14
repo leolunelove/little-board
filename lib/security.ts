@@ -1,3 +1,4 @@
+import { validateImages } from "./task-images";
 export const TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 export class HttpError extends Error {
   constructor(
@@ -31,6 +32,7 @@ export function taskPatch(value: unknown) {
         "status",
         "assigned_to",
         "checklist",
+        "images",
         "original_request",
       ].includes(key)
     )
@@ -40,6 +42,13 @@ export function taskPatch(value: unknown) {
     if (typeof v.note !== "string" || v.note.length > 400)
       throw new HttpError(400, "Keep notes under 400 characters.");
     out.note = v.note.trim();
+  }
+  if ("images" in v) {
+    try {
+      out.images = validateImages(v.images);
+    } catch (e) {
+      throw new HttpError(400, (e as Error).message);
+    }
   }
   if ("checklist" in v) {
     if (!Array.isArray(v.checklist) || v.checklist.length > 20)

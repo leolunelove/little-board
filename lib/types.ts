@@ -1,6 +1,8 @@
 export type Status = "pending" | "waiting" | "done";
 export type ChecklistItem = { id: string; title: string; done: boolean };
+export type TaskImage = { id: string; name: string; src: string };
 export type Task = {
+  images?: TaskImage[];
   id: string;
   board_id: string;
   title: string;
@@ -15,6 +17,7 @@ export type Task = {
   completed_at: string | null;
 };
 export type Board = {
+  description?: string;
   code?: string;
   access?: "owner" | "viewer";
   claimed?: boolean;

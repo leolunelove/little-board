@@ -1,5 +1,5 @@
 export type Appearance = "light" | "night";
-export const APPEARANCE_KEY = "memo:appearance";
+export const APPEARANCE_KEY = "memo:appearance:v2";
 export const APPEARANCE_COLORS = { light: "#f3f6fa", night: "#121821" };
 
 export function validAppearance(value: unknown): Appearance | null {
@@ -27,4 +27,4 @@ export function applyAppearance(appearance: Appearance) {
 
 // Runs in the document head before hydration, so a saved night preference does
 // not briefly paint a light page. The script contains no user-provided values.
-export const APPEARANCE_SCRIPT = `(()=>{let choice;try{choice=localStorage.getItem("${APPEARANCE_KEY}")}catch{}const theme=choice==="light"||choice==="night"?choice:window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches?"night":"light";document.documentElement.dataset.theme=theme;document.documentElement.style.colorScheme=theme==="night"?"dark":"light";const colors=${JSON.stringify(APPEARANCE_COLORS)};document.querySelectorAll('meta[name="theme-color"]').forEach(meta=>meta.setAttribute("content",colors[theme]));})();`;
+export const APPEARANCE_SCRIPT = `(()=>{let choice;try{choice=localStorage.getItem("${APPEARANCE_KEY}")}catch{}const theme=choice==="light"||choice==="night"?choice:"light";document.documentElement.dataset.theme=theme;document.documentElement.style.colorScheme=theme==="night"?"dark":"light";const colors=${JSON.stringify(APPEARANCE_COLORS)};document.querySelectorAll('meta[name="theme-color"]').forEach(meta=>meta.setAttribute("content",colors[theme]));})();`;

@@ -85,6 +85,7 @@ function payload(row: Record<string, any>, uid: string): Board {
     id: row.id,
     code: row.code,
     title: row.title,
+    description: row.description || "",
     tasks: row.tasks,
     updated_at: row.updated_at,
     claimed: true,
@@ -92,29 +93,82 @@ function payload(row: Record<string, any>, uid: string): Board {
     access: row.owner_id === uid ? "owner" : "viewer",
   };
 }
+// Refresh metadata first so unchanged boards do not repeatedly transfer images.
+const boardCache = new Map<string, { board: Board; revision: number }>();
+let cacheUser: string | null = null;
+function cacheFor(uid: string) {
+  if (cacheUser !== uid) {
+    boardCache.clear();
+    cacheUser = uid;
+  }
+  return boardCache;
+}
+async function readCloudRow(
+  code: string,
+  uid: string,
+  meta?: Record<string, any>,
+) {
+  const db = cloudClient();
+  if (!meta) {
+    const result = await db
+      .from("little_boards")
+      .select("id,code,revision,updated_at")
+      .eq("code", code)
+      .maybeSingle();
+    dbError(result.error);
+    meta = result.data || undefined;
+  }
+  if (!meta)
+    throw new HttpError(404, "This board isn’t available to this email.");
+  const cache = cacheFor(uid);
+  const saved = cache.get(meta.id);
+  if (
+    saved &&
+    saved.revision === Number(meta.revision) &&
+    saved.board.updated_at === meta.updated_at
+  )
+    return saved;
+  const result = await db
+    .from("little_boards")
+    .select("*")
+    .eq("code", code)
+    .maybeSingle();
+  dbError(result.error);
+  if (!result.data)
+    throw new HttpError(404, "This board isn’t available to this email.");
+  const loaded = {
+    board: payload(result.data, uid),
+    revision: Number(result.data.revision),
+  };
+  cache.set(result.data.id, loaded);
+  return loaded;
+}
 export async function cloudList() {
   const user = await account();
-  if (!user) return [];
+  if (!user) {
+    boardCache.clear();
+    cacheUser = null;
+    return [];
+  }
   const { data, error } = await cloudClient()
     .from("little_boards")
-    .select("id,code,title,owner_id,viewer_email,updated_at,tasks")
+    .select("id,code,revision,updated_at")
     .order("updated_at", { ascending: false });
   dbError(error);
-  return (data || []).map((row) => payload(row, user.id));
+  const rows = data || [];
+  const cache = cacheFor(user.id);
+  for (const id of cache.keys())
+    if (!rows.some((row) => row.id === id)) cache.delete(id);
+  const boards: Board[] = [];
+  for (const row of rows)
+    boards.push((await readCloudRow(row.code, user.id, row)).board);
+  return boards;
 }
 export async function cloudRead(code: string) {
   const user = await account();
   if (!user)
     throw new HttpError(401, "Sign in with your email to open this board.");
-  const { data, error } = await cloudClient()
-    .from("little_boards")
-    .select("*")
-    .eq("code", code)
-    .maybeSingle();
-  dbError(error);
-  if (!data)
-    throw new HttpError(404, "This board isn’t available to this email.");
-  return { board: payload(data, user.id), revision: data.revision as number };
+  return readCloudRow(code, user.id);
 }
 export async function claimBoard(board: Board) {
   const user = await account();
@@ -137,6 +191,7 @@ export async function claimBoard(board: Board) {
         code,
         owner_id: user.id,
         title: board.title,
+        description: board.description || "",
         tasks: board.tasks,
       })
       .select()
@@ -164,7 +219,12 @@ export async function cloudChange(code: string, command: unknown) {
   const next = applyCommand(board, command);
   const { data, error } = await cloudClient()
     .from("little_boards")
-    .update({ title: next.title, tasks: next.tasks, revision: revision + 1 })
+    .update({
+      title: next.title,
+      description: next.description || "",
+      tasks: next.tasks,
+      revision: revision + 1,
+    })
     .eq("id", board.id)
     .eq("revision", revision)
     .select()

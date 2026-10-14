@@ -18,6 +18,7 @@ export function taskCommand(input: unknown) {
           note: value.note || "",
           status: value.status || "pending",
           assigned_to: value.assigned_to ?? null,
+          ...(value.images !== undefined ? { images: value.images } : {}),
           ...(value.checklist !== undefined
             ? { checklist: value.checklist }
             : {}),
@@ -34,6 +35,13 @@ export function taskCommand(input: unknown) {
       body.action === "add"
         ? { action: "add", task: tasks[0] }
         : { action: "add_many", tasks };
+  } else if (body.action === "describe") {
+    if (
+      typeof body.description !== "string" ||
+      body.description.trim().length > 200
+    )
+      throw new HttpError(400, "Keep board descriptions under 200 characters.");
+    command = { action: "describe", description: body.description.trim() };
   } else if (body.action === "rename") {
     if (
       typeof body.title !== "string" ||
