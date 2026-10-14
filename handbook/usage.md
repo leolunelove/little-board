@@ -43,3 +43,11 @@ They can read the current state without seeing editing controls. The owner remai
 ## A few quiet details
 
 Light and night mode are available in the appearance control. Notes and checklists expand when you need the detail. Redaction is an optional visual effect for selected text; it does not secure or remove that text.
+
+## Images and board details
+
+In the item editor, choose **Image** or paste an image directly into the short note. Images are automatically resized to at most 1280 pixels on the longest edge and compressed to 96 KB or less. Each item can hold three images; a board has a 2 MB image allowance. Tap a thumbnail to see the full reference. Images on saved cloud boards use the board’s existing private access permissions.
+
+**Add a checklist** is visible directly in the editor. Each step can be checked off separately.
+
+Add a short board description below the title. It is shared with people who can read the board. Under **Settings**, choose a local SVG icon, change appearance, or open **What’s new**. Icons and appearance preferences are saved on this device. New visits start in light mode until you choose another appearance.
