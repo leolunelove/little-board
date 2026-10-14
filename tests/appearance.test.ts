@@ -78,14 +78,14 @@ function expectMode(mode: "light" | "night") {
   );
 }
 
-test("appearance starts with the device setting and follows it until the user chooses", () => {
+test("appearance starts light even on a dark device until the user chooses", () => {
   ui.render(createElement(AppearanceControl));
   expectMode("light");
   ui.act(() => {
     dark = true;
     listeners.forEach((listener) => listener());
   });
-  expectMode("night");
+  expectMode("light");
   ui.fireEvent.click(ui.screen.getByRole("button", { name: "Light mode" }));
   expectMode("light");
   ui.act(() => {
@@ -150,7 +150,7 @@ test("the head bootstrap applies the saved mode before React starts, with safe d
   localStorage.setItem(APPEARANCE_KEY, "invalid");
   dark = true;
   dom.window.eval(APPEARANCE_SCRIPT);
-  assert.equal(document.documentElement.dataset.theme, "night");
+  assert.equal(document.documentElement.dataset.theme, "light");
   localStorage.setItem(APPEARANCE_KEY, "light");
   dom.window.eval(APPEARANCE_SCRIPT);
   assert.equal(document.documentElement.dataset.theme, "light");

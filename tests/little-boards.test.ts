@@ -131,6 +131,18 @@ test("PostgreSQL allows verified owners, gives invited viewers read-only access,
         "utf8",
       ),
     );
+    await db.exec(
+      await readFile(
+        new URL("../supabase/image-validation.sql", import.meta.url),
+        "utf8",
+      ),
+    );
+    await db.exec(
+      await readFile(
+        new URL("../supabase/board-details.sql", import.meta.url),
+        "utf8",
+      ),
+    );
     const helper = await db.query<{ schema_name: string }>(
       "select n.nspname as schema_name from pg_proc p join pg_namespace n on n.oid=p.pronamespace where p.proname='verified_email'",
     );
@@ -193,7 +205,48 @@ test("PostgreSQL allows verified owners, gives invited viewers read-only access,
       ]),
       /Invalid board/,
     );
+    await db.exec("update little_boards set description='A shared plan'");
+    await assert.rejects(
+      db.query("update little_boards set tasks=$1", [
+        JSON.stringify([
+          {
+            ...item,
+            images: [
+              { id: taskId, name: "Bad", src: "https://example.com/image.png" },
+            ],
+          },
+        ]),
+      ]),
+      /compressed image/,
+    );
+    await db.query("update little_boards set tasks=$1", [
+      JSON.stringify([
+        {
+          ...item,
+          images: [
+            {
+              id: taskId,
+              name: "Reference",
+              src: "data:image/webp;base64,UklGRg==",
+            },
+          ],
+        },
+      ]),
+    ]);
     await as(viewer);
+    assert.equal(
+      (await db.query<{description:string}>("select description from little_boards")).rows[0]
+        .description,
+      "A shared plan",
+    );
+    assert.equal(
+      (
+        await db.query(
+          "update little_boards set description='Bad' returning id",
+        )
+      ).rows.length,
+      0,
+    );
     assert.equal(
       (await db.query("select * from little_boards")).rows.length,
       1,

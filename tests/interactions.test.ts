@@ -671,7 +671,7 @@ test("Edit is tucked into the footer, away from the reading header", () => {
   assert.ok(
     ui
       .within(ui.screen.getByRole("contentinfo"))
-      .getByRole("group", { name: "Appearance" }),
+      .getByRole("button", { name: "Profile settings" }),
   );
   assert.equal(ui.screen.queryByRole("textbox", { name: "Board title" }), null);
   assert.equal(ui.screen.queryByRole("button", { name: "Add item" }), null);
@@ -1589,9 +1589,7 @@ test("All items refreshes on focus but preserves an active edit", async () => {
     });
   };
   ui.render(createElement(AllItems, { initial: [owned] }));
-  ui.fireEvent.click(
-    ui.screen.getByRole("button", { name: task.title }),
-  );
+  ui.fireEvent.click(ui.screen.getByRole("button", { name: task.title }));
   ui.fireEvent.change(ui.screen.getByRole("textbox", { name: "Item title" }), {
     target: { value: "My unfinished edit" },
   });
@@ -1604,12 +1602,42 @@ test("All items refreshes on focus but preserves an active edit", async () => {
       .value,
     "My unfinished edit",
   );
-  ui.fireEvent.click(
-    ui.screen.getByRole("button", { name: "Cancel" }),
-  );
+  ui.fireEvent.click(ui.screen.getByRole("button", { name: "Cancel" }));
   await ui.act(async () => {
     window.dispatchEvent(new window.Event("focus"));
   });
   assert.equal(reads, 1);
   assert.ok(ui.screen.getByText("Updated elsewhere"));
+});
+
+test("checklist is discoverable before details and image attachments survive an edit", async () => {
+  const image = {
+    id: "8b12e658-bb7b-4f56-9afc-799171ff50be",
+    name: "Reference",
+    src: "data:image/webp;base64,UklGRg==",
+  };
+  let saved: Partial<Task> | undefined;
+  ui.render(
+    createElement(TaskEditor, {
+      task: { ...task, images: [image] },
+      onCancel() {},
+      async onSave(patch) {
+        saved = patch;
+        return true;
+      },
+    }),
+  );
+  assert.ok(ui.screen.getByRole("button", { name: "Add a checklist" }));
+  ui.fireEvent.click(
+    ui.screen.getByRole("button", { name: "Add a checklist" }),
+  );
+  ui.fireEvent.change(
+    ui.screen.getByRole("textbox", { name: "Checklist step 1" }),
+    { target: { value: "Confirm the new price" } },
+  );
+  await ui.act(async () => {
+    ui.fireEvent.submit(ui.screen.getByRole("form", { name: "Edit item" }));
+  });
+  assert.deepEqual(saved?.images, [image]);
+  assert.equal(saved?.checklist?.[0].title, "Confirm the new price");
 });
