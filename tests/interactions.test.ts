@@ -1641,3 +1641,38 @@ test("checklist is discoverable before details and image attachments survive an 
   assert.deepEqual(saved?.images, [image]);
   assert.equal(saved?.checklist?.[0].title, "Confirm the new price");
 });
+
+test("closing an image preview with Escape keeps the unfinished item edit", () => {
+  let cancelled = 0;
+  const image = {
+    id: "8b12e658-bb7b-4f56-9afc-799171ff50be",
+    name: "Reference",
+    src: "data:image/webp;base64,UklGRg==",
+  };
+  ui.render(
+    createElement(TaskEditor, {
+      task: { ...task, images: [image] },
+      onCancel() {
+        cancelled++;
+      },
+      async onSave() {
+        return true;
+      },
+    }),
+  );
+  ui.fireEvent.change(ui.screen.getByRole("textbox", { name: "Item title" }), {
+    target: { value: "Unfinished title" },
+  });
+  ui.fireEvent.click(
+    ui.screen.getByRole("button", { name: "Open image: Reference" }),
+  );
+  const dialog = ui.screen.getByRole("dialog", { name: "Reference" });
+  ui.fireEvent.keyDown(dialog, { key: "Escape" });
+  ui.fireEvent(dialog, new window.Event("cancel", {cancelable:true}));
+  assert.equal(cancelled, 0);
+  assert.equal(
+    (ui.screen.getByRole("textbox", { name: "Item title" }) as HTMLInputElement)
+      .value,
+    "Unfinished title",
+  );
+});
