@@ -205,7 +205,7 @@ test("a quick-add draft survives editing another item and cannot be lost by open
   ui.fireEvent.click(ui.screen.getByRole("button", { name: task.title }));
   assert.equal(ui.screen.queryByRole("form", { name: "Add item" }), null);
   assert.ok(input.isConnected);
-  ui.fireEvent.click(ui.screen.getByRole("button", { name: "Cancel" }));
+  ui.fireEvent.click(ui.screen.getByRole("button", { name: "Done editing" }));
   assert.equal(ui.screen.getByRole("textbox", { name: "Item title" }), input);
   assert.equal(input.value, "Unfinished new item");
   assert.equal(document.activeElement, input);
@@ -1848,4 +1848,57 @@ test("closing an image with its button never submits the surrounding item form",
       .value,
     "Keep this draft",
   );
+});
+
+test("Done editing closes an unchanged item without writing and returns keyboard focus", () => {
+  let writes = 0;
+  globalThis.fetch = async () => {
+    writes++;
+    return response(initial);
+  };
+  ui.render(createElement(MemoBoard, { initial, mode: "owner" }));
+  ui.fireEvent.click(ui.screen.getByRole("button", { name: task.title }));
+  ui.fireEvent.click(ui.screen.getByRole("button", { name: "Done editing" }));
+  assert.equal(ui.screen.queryByRole("form", { name: "Edit item" }), null);
+  assert.equal(writes, 0);
+  assert.equal(
+    document.activeElement,
+    ui.screen.getByRole("button", { name: task.title }),
+  );
+});
+
+test("a completed archived list has a finished state rather than suggesting a new board", () => {
+  const finished: Board = {
+    ...initial,
+    tasks: [
+      {
+        ...task,
+        status: "done",
+        completed_at: new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString(),
+      },
+    ],
+  };
+  ui.render(
+    createElement(MemoBoard, { initial: finished, mode: "owner", demo: true }),
+  );
+  ui.fireEvent.click(ui.screen.getByRole("button", { name: "List" }));
+  assert.ok(
+    ui.screen.getByText("All caught up. Completed items are in Archived."),
+  );
+  assert.equal(
+    ui.screen.queryByText("A fresh list. Add your first item below."),
+    null,
+  );
+});
+
+test("an open item menu gets its own layer and Close returns focus to its trigger", () => {
+  ui.render(createElement(MemoBoard, { initial, mode: "owner" }));
+  const trigger = ui.screen.getByRole("button", {
+    name: `Options for ${task.title}`,
+  });
+  ui.fireEvent.click(trigger);
+  assert.ok(trigger.closest(".row-tools")?.classList.contains("menu-open"));
+  ui.fireEvent.click(ui.screen.getByRole("button", { name: "Close" }));
+  assert.equal(document.querySelector(".row-menu"), null);
+  assert.equal(document.activeElement, trigger);
 });
