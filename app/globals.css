@@ -2510,3 +2510,7 @@ html[data-theme="light"] .add-area {
   color: var(--ink);
   font-size: 13px;
 }
+/* Native file inputs are invoked by the small image/icon buttons. */
+[hidden] {
+  display: none !important;
+}
