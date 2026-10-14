@@ -51,3 +51,23 @@ In the item editor, choose **Image** or paste an image directly into the short n
 **Add a checklist** is visible directly in the editor. Each step can be checked off separately.
 
 Add a short board description below the title. It is shared with people who can read the board. Under **Settings**, choose a local SVG icon, change appearance, or open **What’s new**. Icons and appearance preferences are saved on this device. New visits start in light mode until you choose another appearance.
+
+## Install and choose where to start
+
+Open **Settings → Install Little Board**. On supported desktop and Android browsers, use **Install app**. On iPhone, open the site in Safari and choose **Share → Add to Home Screen**. Installation is optional; the website works as before.
+
+Choose **Last board**, **Your boards**, or **All items** under **When the app opens**. This preference applies to launching the installed app; direct board links still open the requested board. Themes remain in Settings.
+
+## Work offline
+
+After the app is ready to open offline, previously opened boards have a device copy. Guest boards still save locally. On email-owned boards, edits are saved to the device first, then synced when Little Board is open and connected. Shared boards remain read-only.
+
+The save label tells you whether changes are saved on the device, waiting to sync, or saved to your email. If another device has changed the board, Little Board stops syncing that copy rather than replacing those changes. Open **Settings → Changes on this device → Keep a local copy** to preserve your edits as a new guest board for review.
+
+Sign-out asks you to sync or preserve pending edits first, then clears cached email boards from this device. A browser can remove site storage, so offline copies are not a substitute for backups.
+
+## Download and restore a backup
+
+Inside a board, choose **Settings → Download this board**. The JSON file contains saved items, notes, checklist progress, and compressed images. Keep it somewhere private; the file is readable and does not contain sign-in credentials or invitations.
+
+Choose **Restore a board** in Settings to import a Little Board backup. Restore always creates a new board on this device and keeps the original intact. Save that new board to your email if you want it available elsewhere.
