@@ -8,7 +8,8 @@ import {
   Check,
   Link2,
 } from "lucide-react";
-import { AppearanceControl } from "./appearance-control";
+import { ProfileSettings as AppearanceControl } from "./profile-settings";
+import { BoardIcon } from "./board-icon";
 import { AllItems } from "./all-items";
 import { MemoBoard } from "./memo-board";
 import { MagicLinkForm } from "./magic-link-form";
@@ -526,11 +527,16 @@ export function LittleBoardApp() {
                   >
                     <span className="summary-topline">
                       <span className="summary-mark" aria-hidden="true">
-                        ≡
+                        <BoardIcon id={b.id} />
                       </span>
                       <strong>{b.title}</strong>
                       <span className="summary-code">#{b.code}</span>
                     </span>
+                    {b.description && (
+                      <span className="summary-description">
+                        {b.description}
+                      </span>
+                    )}
                     <span className="summary-divider" />
                     <span className="summary-caption">AT A GLANCE</span>
                     <span className="summary-counts">

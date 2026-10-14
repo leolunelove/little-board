@@ -20,7 +20,7 @@ export function Sheet({
     dialog
       .querySelector<
         HTMLInputElement | HTMLTextAreaElement
-      >("input:not([type=checkbox]), textarea")
+      >("input:not([type=checkbox]):not([type=file]), textarea")
       ?.focus({ preventScroll: true });
     return () => {
       dialog.close();

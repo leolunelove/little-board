@@ -11,7 +11,7 @@ import { TaskEditor } from "./task-editor";
 import { useMemoMutations } from "./use-memo-mutations";
 import { useSessionDraft } from "./use-session-draft";
 import { useComposerDock } from "./use-composer-dock";
-import { AppearanceControl } from "./appearance-control";
+import { ProfileSettings as AppearanceControl } from "./profile-settings";
 
 const labels = { pending: "Pending", waiting: "Waiting", done: "Done" };
 const statuses: Status[] = ["pending", "waiting", "done"];
@@ -522,6 +522,7 @@ export function AllItems({
                     title: patch.title!,
                     note: patch.note || "",
                     checklist: patch.checklist,
+                    images: patch.images,
                     assigned_to: patch.assigned_to || null,
                     status: patch.status || "pending",
                     sort_order:

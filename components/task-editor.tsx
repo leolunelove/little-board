@@ -1,7 +1,9 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown, Plus, X } from "lucide-react";
-import type { Task, Status } from "@/lib/types";
+import { ChevronDown, Plus, X, ImagePlus, ListChecks } from "lucide-react";
+import { compressImage, MAX_IMAGES } from "@/lib/task-images";
+import { TaskImages } from "./task-images";
+import type { Task, Status, TaskImage } from "@/lib/types";
 
 export function TaskEditor({
   task,
@@ -35,6 +37,22 @@ export function TaskEditor({
   const [checklist, setChecklist] = useState(
     draft?.checklist ?? task?.checklist ?? [],
   );
+  const [images, setImages] = useState(draft?.images ?? task?.images ?? []);
+  const [processing, setProcessing] = useState(false);
+  const [imageError, setImageError] = useState("");
+  const imageInput = useRef<HTMLInputElement>(null);
+  const processingRef = useRef(false);
+  const pickerOpen = useRef(false);
+  const imageChanged =
+    JSON.stringify(images) !== JSON.stringify(task?.images || []);
+  useEffect(() => {
+    const element = imageInput.current;
+    const closePicker = () => {
+      pickerOpen.current = false;
+    };
+    element?.addEventListener("cancel", closePicker);
+    return () => element?.removeEventListener("cancel", closePicker);
+  }, []);
   const originalRequest = draft?.original_request ?? task?.original_request;
   const [details, setDetails] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -44,7 +62,12 @@ export function TaskEditor({
   const cancelled = useRef(false);
   const input = useRef<HTMLInputElement>(null);
   const dirty = Boolean(
-    title || note || assigned || checklist.length || status !== "pending",
+    title ||
+    note ||
+    assigned ||
+    checklist.length ||
+    images.length ||
+    status !== "pending",
   );
   const checklistChanged =
     JSON.stringify(checklist) !== JSON.stringify(task?.checklist || []);
@@ -62,7 +85,8 @@ export function TaskEditor({
         note !== task.note ||
         status !== task.status ||
         assigned !== (task.assigned_to || "") ||
-        checklistChanged;
+        checklistChanged ||
+        imageChanged;
     onDraftChange(
       id.current,
       changed
@@ -70,6 +94,7 @@ export function TaskEditor({
             title,
             note,
             checklist,
+            images,
             status,
             assigned_to: (assigned as Task["assigned_to"]) || null,
           }
@@ -83,6 +108,8 @@ export function TaskEditor({
     assigned,
     checklist,
     checklistChanged,
+    images,
+    imageChanged,
     dirty,
     onDraftChange,
   ]);
@@ -92,7 +119,8 @@ export function TaskEditor({
     note.trim() !== task.note ||
     status !== task.status ||
     assigned !== (task.assigned_to || "") ||
-    checklistChanged;
+    checklistChanged ||
+    imageChanged;
   function cancel() {
     cancelled.current = true;
     onCancel();
@@ -110,13 +138,52 @@ export function TaskEditor({
       document.getElementById(`step-${step.id}`)?.focus(),
     );
   }
-  const locked = saving || busy;
+  async function attach(files: File[]) {
+    if (processingRef.current || busy || saving) return;
+    if (files.length + images.length > MAX_IMAGES) {
+      setImageError("Use up to three images per item.");
+      return;
+    }
+    processingRef.current = true;
+    setProcessing(true);
+    setImageError("");
+    setDetails(true);
+    try {
+      const added: TaskImage[] = [];
+      for (const file of files) added.push(await compressImage(file));
+      if (!cancelled.current) setImages((current) => [...current, ...added]);
+    } catch (e) {
+      setImageError((e as Error).message);
+    } finally {
+      processingRef.current = false;
+      setProcessing(false);
+    }
+  }
+  const locked = saving || busy || processing;
   return (
     <form
       className={`task-editor${task ? "" : " quick-add"}${details ? " details-open" : ""}`}
       aria-label={task ? "Edit item" : "Add item"}
+      onPaste={(event) => {
+        const files = Array.from(event.clipboardData.files).filter((file) =>
+          file.type.startsWith("image/"),
+        );
+        if (files.length) {
+          event.preventDefault();
+          void attach(files);
+        }
+      }}
       onBlur={(event) => {
-        if (!task || cancelled.current || locked || failed) return;
+        if (
+          !task ||
+          cancelled.current ||
+          locked ||
+          failed ||
+          processingRef.current ||
+          pickerOpen.current ||
+          document.querySelector("dialog[open]")
+        )
+          return;
         if (
           event.relatedTarget instanceof Node &&
           event.currentTarget.contains(event.relatedTarget)
@@ -144,6 +211,7 @@ export function TaskEditor({
           ok = await onSave(
             {
               title: title.trim(),
+              images,
               checklist: checklist
                 .filter((step) => step.title.trim())
                 .map((step) => ({
@@ -174,6 +242,7 @@ export function TaskEditor({
           setTitle("");
           setNote("");
           setChecklist([]);
+          setImages([]);
           setStatus("pending");
           setAssigned("");
           setDetails(false);
@@ -232,6 +301,40 @@ export function TaskEditor({
           </button>
         )}
       </div>
+      <input
+        ref={imageInput}
+        type="file"
+        accept="image/png,image/jpeg,image/webp,image/gif,image/avif"
+        multiple
+        hidden
+        aria-label="Choose item images"
+        onChange={(event) => {
+          pickerOpen.current = false;
+          void attach(Array.from(event.target.files || []));
+          event.target.value = "";
+        }}
+      />
+      <TaskImages
+        images={images}
+        onRemove={
+          locked
+            ? undefined
+            : (id) =>
+                setImages((current) =>
+                  current.filter((image) => image.id !== id),
+                )
+        }
+      />
+      {processing && (
+        <p className="attachment-hint" role="status">
+          Compressing image…
+        </p>
+      )}
+      {imageError && (
+        <p className="draft-error" role="alert">
+          {imageError}
+        </p>
+      )}
       {details && (
         <div className="editor-details">
           <label className="sr-only" htmlFor={`note-${id.current}`}>
@@ -240,7 +343,7 @@ export function TaskEditor({
           <textarea
             id={`note-${id.current}`}
             aria-label="Short note"
-            placeholder="Add a short note…"
+            placeholder="Add a short note… or paste an image"
             value={note}
             rows={2}
             onChange={(event) => {
@@ -299,15 +402,17 @@ export function TaskEditor({
                 </button>
               </div>
             ))}
-            <button
-              type="button"
-              className="text-button"
-              disabled={locked || checklist.length >= 20}
-              onClick={() => appendStep()}
-            >
-              <Plus size={14} />
-              {checklist.length ? "Add step" : "Add a checklist"}
-            </button>
+            {checklist.length > 0 && (
+              <button
+                type="button"
+                className="text-button"
+                disabled={locked || checklist.length >= 20}
+                onClick={() => appendStep()}
+              >
+                <Plus size={14} />
+                Add step
+              </button>
+            )}
           </div>
           <div className="editor-fields">
             <select
@@ -348,6 +453,30 @@ export function TaskEditor({
         >
           <ChevronDown size={13} />
           {details ? "Less detail" : "Add details"}
+        </button>
+        {!checklist.length && (
+          <button
+            type="button"
+            className="text-button"
+            disabled={locked}
+            onClick={() => {
+              setDetails(true);
+              appendStep();
+            }}
+          >
+            <ListChecks size={14} /> Add a checklist
+          </button>
+        )}
+        <button
+          type="button"
+          className="text-button"
+          disabled={locked || images.length >= MAX_IMAGES}
+          onClick={() => {
+            pickerOpen.current = true;
+            imageInput.current?.click();
+          }}
+        >
+          <ImagePlus size={14} /> Image
         </button>
         {!task && (
           <span className="add-key-hint">Enter to add · Esc to finish</span>

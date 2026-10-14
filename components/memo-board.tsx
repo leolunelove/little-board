@@ -1,4 +1,6 @@
 "use client";
+import { BoardIcon } from "./board-icon";
+import { TaskImages } from "./task-images";
 import { transport } from "@/lib/transport";
 import { navigate } from "@/lib/navigation";
 import {
@@ -56,7 +58,7 @@ import { useSessionDraft } from "@/components/use-session-draft";
 import { PasteRequest, type ImportedItem } from "@/components/paste-request";
 import { TaskChecklist } from "@/components/task-checklist";
 import { TaskNote } from "@/components/task-note";
-import { AppearanceControl } from "@/components/appearance-control";
+import { ProfileSettings as AppearanceControl } from "./profile-settings";
 import { useComposerDock } from "@/components/use-composer-dock";
 import { useReadingPreferences } from "@/components/use-reading-preferences";
 import { useMemoMutations } from "@/components/use-memo-mutations";
@@ -753,6 +755,9 @@ export function MemoBoard({
         <span className="memo-signature" aria-hidden="true">
           little board<span>.</span>
         </span>
+        <div className="board-icon-display">
+          <BoardIcon id={board.id} />
+        </div>
         <h1>
           {writable ? (
             <input
@@ -788,6 +793,36 @@ export function MemoBoard({
             board.title
           )}
         </h1>
+        {writable ? (
+          <textarea
+            className="board-description"
+            aria-label="Board description"
+            placeholder="Add a short description…"
+            defaultValue={board.description || ""}
+            key={board.description || ""}
+            maxLength={200}
+            rows={1}
+            disabled={busy}
+            onBlur={(event) => {
+              const description = event.target.value.trim();
+              if (description !== (board.description || ""))
+                window.setTimeout(
+                  () =>
+                    void change(
+                      "describe",
+                      { description },
+                      (current) => ({ ...current, description }),
+                      true,
+                    ),
+                  0,
+                );
+            }}
+          />
+        ) : (
+          board.description && (
+            <p className="board-description">{board.description}</p>
+          )
+        )}
         <div className="header-meta">
           <div
             className={`updated${busy ? " is-saving" : ""}${error && writable ? " is-unsaved" : ""}`}
@@ -1114,6 +1149,7 @@ export function MemoBoard({
                   title: patch.title!,
                   note: patch.note || "",
                   checklist: patch.checklist,
+                  images: patch.images,
                   original_request: patch.original_request,
                   status: patch.status || "pending",
                   assigned_to: patch.assigned_to || null,
@@ -1264,7 +1300,7 @@ export function MemoBoard({
                 : "Updates automatically"}
           </span>
           <div className="footer-controls">
-            <AppearanceControl />
+            <AppearanceControl boardId={board.id} />
             {!writable && !initial.code && (
               <a
                 className="edit-entry"
@@ -1539,6 +1575,7 @@ export function TaskRow({
                 onToggle={onToggleNote}
               />
             )}
+            <TaskImages images={task.images} />
             <TaskChecklist
               task={task}
               initiallyOpen={initiallyOpen}

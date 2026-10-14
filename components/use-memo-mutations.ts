@@ -117,6 +117,7 @@ export function useMemoMutations(
                       "status",
                       "assigned_to",
                       "checklist",
+                      "images",
                       "original_request",
                     ].every(
                       (key) =>

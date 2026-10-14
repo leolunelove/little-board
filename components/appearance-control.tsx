@@ -18,7 +18,7 @@ export function AppearanceControl() {
     const media = window.matchMedia?.("(prefers-color-scheme: dark)");
     chosen.current = savedAppearance();
     const sync = () => {
-      const next = chosen.current ?? (media?.matches ? "night" : "light");
+      const next = chosen.current ?? "light";
       setAppearance(next);
       applyAppearance(next);
     };
