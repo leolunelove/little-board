@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { PwaRuntime } from "@/components/pwa-runtime";
 import { APPEARANCE_SCRIPT } from "@/lib/appearance";
 import "./globals.css";
 import "./surface.css";
@@ -9,7 +10,8 @@ export const metadata: Metadata = {
   description:
     "A little less to remember. Create a board or sign in with email.",
   robots: { index: false, follow: false },
-  icons: { icon: `${basePath}/icon.svg` },
+  manifest: `${basePath}/manifest.webmanifest`,
+  icons: { icon: `${basePath}/icon.svg`, apple: `${basePath}/icon-192.png` },
   appleWebApp: {
     capable: true,
     title: "Little Board",
@@ -36,7 +38,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         />
         <script dangerouslySetInnerHTML={{ __html: APPEARANCE_SCRIPT }} />
       </head>
-      <body>{children}</body>
+      <body>
+        <PwaRuntime />
+        {children}
+      </body>
     </html>
   );
 }

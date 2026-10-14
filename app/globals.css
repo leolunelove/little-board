@@ -2514,3 +2514,82 @@ html[data-theme="light"] .add-area {
 [hidden] {
   display: none !important;
 }
+.app-tools select {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  color: var(--ink);
+  background: var(--field);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font: inherit;
+}
+.app-tools .text-button {
+  min-height: 44px;
+  margin-right: 12px;
+}
+.app-tools h3 {
+  font-size: 14px;
+  margin-top: 24px;
+}
+.pending-board {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.pending-board p {
+  color: var(--muted);
+  margin: 5px 0;
+}
+.sync-pending {
+  background: var(--waiting) !important;
+}
+.sync-conflict {
+  background: var(--red) !important;
+}
+.save-time {
+  white-space: nowrap;
+}
+@media (pointer: coarse) {
+  .drag-handle,
+  .status-button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .task-checklist input[type="checkbox"] {
+    width: 22px;
+    height: 22px;
+  }
+  .task-checklist li {
+    min-height: 44px;
+    align-items: center;
+  }
+  .image-remove {
+    width: 32px;
+    height: 32px;
+  }
+  .image-preview {
+    touch-action: manipulation;
+  }
+  .task-editor input,
+  .task-editor textarea,
+  .board-description {
+    font-size: 16px;
+  }
+}
+@media (max-width: 600px) {
+  .image-full {
+    max-height: 65dvh;
+  }
+  .task-images {
+    gap: 10px;
+  }
+  .task-image {
+    width: 96px;
+    height: 76px;
+  }
+  .updated {
+    line-height: 1.65;
+  }
+}
